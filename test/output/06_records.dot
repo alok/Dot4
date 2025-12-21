@@ -1,0 +1,11 @@
+digraph "Test06_Records" {
+    rankdir="LR";
+
+    "struct1" [label="{<f0>field0|<f1>field1|<f2>field2}", shape="record"];
+    "struct2" [label="{<a>A|<b>B|<c>C}", shape="record"];
+    "struct3" [label="{{<x>X|<y>Y}|<z>Z}", shape="record"];
+    "struct1":f0 -> "struct2":a;
+    "struct1":f1 -> "struct2":b;
+    "struct1":f2 -> "struct2":c;
+    "struct2":c -> "struct3":x;
+}

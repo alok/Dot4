@@ -1,0 +1,15 @@
+digraph "Test08_Arrows" {
+    rankdir="LR";
+
+    "a";
+    "b";
+    "c";
+    "d";
+    "e";
+    "f";
+    "a" -> "b" [arrowhead="normal", label="normal"];
+    "a" -> "c" [arrowhead="diamond", label="diamond"];
+    "a" -> "d" [arrowhead="dot", label="dot"];
+    "a" -> "e" [arrowhead="vee", label="vee"];
+    "a" -> "f" [arrowhead="crow", label="crow"];
+}

@@ -1,0 +1,28 @@
+digraph "Test04_Clusters" {
+    rankdir="TB";
+
+    subgraph "cluster_group1" {
+        label="Group 1";
+        bgcolor="#E8F5E9";
+        "a1" [label="A1"];
+        "a2" [label="A2"];
+        "a3" [label="A3"];
+    }
+    subgraph "cluster_group2" {
+        label="Group 2";
+        bgcolor="#E3F2FD";
+        "b1" [label="B1"];
+        "b2" [label="B2"];
+    }
+    subgraph "cluster_group3" {
+        label="Group 3";
+        bgcolor="#FFF3E0";
+        "c1" [label="C1"];
+    }
+
+    "a1" -> "a2";
+    "a2" -> "a3";
+    "a3" -> "b1";
+    "b1" -> "b2";
+    "b2" -> "c1";
+}

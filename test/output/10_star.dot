@@ -1,0 +1,17 @@
+digraph "Test10_Star" {
+    rankdir="TB";
+
+    "hub" [shape="doublecircle", style="filled", fillcolor="#FFD700"];
+    "spoke1" [shape="circle"];
+    "spoke2" [shape="circle"];
+    "spoke3" [shape="circle"];
+    "spoke4" [shape="circle"];
+    "spoke5" [shape="circle"];
+    "spoke6" [shape="circle"];
+    "hub" -> "spoke1";
+    "hub" -> "spoke2";
+    "hub" -> "spoke3";
+    "hub" -> "spoke4";
+    "hub" -> "spoke5";
+    "hub" -> "spoke6";
+}

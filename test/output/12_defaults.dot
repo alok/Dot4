@@ -1,0 +1,13 @@
+digraph "Test12_Defaults" {
+    rankdir="LR";
+    node [shape="box", style="filled", fillcolor="#B3E5FC", fontname="Helvetica"];
+    edge [arrowsize="0.7", color="#1976D2"];
+
+    "a" [label="Node A"];
+    "b" [label="Node B"];
+    "c" [label="Node C"];
+    "special" [label="Override", fillcolor="#FFCDD2"];
+    "a" -> "b";
+    "b" -> "c";
+    "c" -> "special";
+}

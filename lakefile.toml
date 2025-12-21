@@ -8,3 +8,7 @@ name = "Dot4"
 [[lean_exe]]
 name = "dot4"
 root = "Main"
+
+[[lean_exe]]
+name = "dot4-test"
+root = "test.Tests"

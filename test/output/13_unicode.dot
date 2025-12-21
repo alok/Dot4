@@ -1,0 +1,11 @@
+digraph "Test13_Unicode" {
+    rankdir="LR";
+
+    "alpha" [label="α β γ"];
+    "math" [label="∀x∈ℝ: x²≥0"];
+    "arrows" [label="← → ↔ ⇒"];
+    "quote" [label="Say \"Hello\""];
+    "alpha" -> "math";
+    "math" -> "arrows";
+    "arrows" -> "quote";
+}

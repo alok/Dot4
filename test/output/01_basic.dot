@@ -1,0 +1,10 @@
+digraph "Test01_Basic" {
+    rankdir="LR";
+
+    "a" [label="Node A"];
+    "b" [label="Node B"];
+    "c" [label="Node C"];
+    "a" -> "b";
+    "b" -> "c";
+    "c" -> "a";
+}

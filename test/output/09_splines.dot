@@ -1,0 +1,14 @@
+digraph "Test09_Ortho" {
+    splines="ortho";
+    rankdir="TB";
+    node [shape="box"];
+
+    "a" [label="Start"];
+    "b" [label="Step 1"];
+    "c" [label="Step 2"];
+    "d" [label="End"];
+    "a" -> "b";
+    "a" -> "c";
+    "b" -> "d";
+    "c" -> "d";
+}

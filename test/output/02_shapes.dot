@@ -1,0 +1,23 @@
+digraph "Test02_Shapes" {
+    rankdir="TB";
+
+    "box" [shape="box", label="box"];
+    "circle" [shape="circle", label="circle"];
+    "diamond" [shape="diamond", label="diamond"];
+    "ellipse" [shape="ellipse", label="ellipse"];
+    "hexagon" [shape="hexagon", label="hexagon"];
+    "octagon" [shape="octagon", label="octagon"];
+    "star" [shape="star", label="star"];
+    "triangle" [shape="triangle", label="triangle"];
+    "cylinder" [shape="cylinder", label="cylinder"];
+    "note" [shape="note", label="note"];
+    "box" -> "circle";
+    "circle" -> "diamond";
+    "diamond" -> "ellipse";
+    "ellipse" -> "hexagon";
+    "hexagon" -> "octagon";
+    "octagon" -> "star";
+    "star" -> "triangle";
+    "triangle" -> "cylinder";
+    "cylinder" -> "note";
+}

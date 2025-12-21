@@ -1,0 +1,13 @@
+digraph "Test03_Styling" {
+    rankdir="LR";
+
+    "filled" [style="filled", fillcolor="#FFB6C1", label="Filled"];
+    "bold" [style="bold", label="Bold"];
+    "dashed" [style="dashed", label="Dashed"];
+    "dotted" [style="dotted", label="Dotted"];
+    "rounded" [style="rounded", shape="box", label="Rounded"];
+    "filled" -> "bold" [style="bold"];
+    "bold" -> "dashed" [style="dashed"];
+    "dashed" -> "dotted" [style="dotted"];
+    "dotted" -> "rounded";
+}

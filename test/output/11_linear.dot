@@ -1,0 +1,15 @@
+digraph "Test11_Linear" {
+    rankdir="LR";
+
+    "A" [shape="box"];
+    "B" [shape="box"];
+    "C" [shape="box"];
+    "D" [shape="box"];
+    "E" [shape="box"];
+    "F" [shape="box"];
+    "A" -> "B";
+    "B" -> "C";
+    "C" -> "D";
+    "D" -> "E";
+    "E" -> "F";
+}

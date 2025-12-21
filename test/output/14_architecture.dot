@@ -1,0 +1,34 @@
+digraph "Test14_Architecture" {
+    rankdir="TB";
+    splines="ortho";
+    nodesep="0.8";
+    ranksep="1.0";
+    node [shape="box", style="rounded,filled", fontname="Helvetica"];
+    edge [arrowsize="0.7"];
+
+    subgraph "cluster_ui" {
+        label="UI Layer";
+        bgcolor="#FFECB3";
+        "web" [label="Web", fillcolor="#FFE082"];
+        "mobile" [label="Mobile", fillcolor="#FFE082"];
+    }
+    subgraph "cluster_api" {
+        label="API Layer";
+        bgcolor="#C8E6C9";
+        "gateway" [label="Gateway", fillcolor="#A5D6A7"];
+        "auth" [label="Auth", fillcolor="#A5D6A7"];
+    }
+    subgraph "cluster_data" {
+        label="Data Layer";
+        bgcolor="#BBDEFB";
+        "cache" [label="Cache", fillcolor="#90CAF9"];
+        "db" [label="Database", fillcolor="#90CAF9"];
+    }
+
+    "web" -> "gateway";
+    "mobile" -> "gateway";
+    "gateway" -> "auth";
+    "gateway" -> "cache";
+    "auth" -> "cache";
+    "cache" -> "db";
+}

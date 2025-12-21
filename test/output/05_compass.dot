@@ -1,0 +1,21 @@
+digraph "Test05_Compass" {
+    node [shape="box", width="1.5", height="1.0"];
+
+    "center" [label="Center"];
+    "north" [label="North"];
+    "south" [label="South"];
+    "east" [label="East"];
+    "west" [label="West"];
+    "ne" [label="NE"];
+    "nw" [label="NW"];
+    "se" [label="SE"];
+    "sw" [label="SW"];
+    "center":n -> "north":s;
+    "center":s -> "south":n;
+    "center":e -> "east":w;
+    "center":w -> "west":e;
+    "center":ne -> "ne":sw;
+    "center":nw -> "nw":se;
+    "center":se -> "se":nw;
+    "center":sw -> "sw":ne;
+}
