@@ -1,0 +1,12 @@
+digraph MacroExpansion {
+    rankdir="TB";
+    bgcolor="#1e1e1e";
+
+    n0 [label="center"];
+    n1 [label="b2"];
+    n2 [label="(4 : Pos)"];
+    n3 [label="Pos.mk 4"];
+    n0 -> n1;
+    n1 -> n2;
+    n2 -> n3;
+}

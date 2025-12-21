@@ -1,0 +1,12 @@
+digraph StateMachine {
+    rankdir="LR";
+
+    start [shape="circle", label=""];
+    s1 [label="Idle"];
+    s2 [label="Running"];
+    s3 [label="Done", shape="doublecircle"];
+    start -> s1;
+    s1 -> s2 [label="run"];
+    s2 -> s2 [label="tick"];
+    s2 -> s3 [label="finish"];
+}

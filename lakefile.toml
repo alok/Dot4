@@ -1,0 +1,10 @@
+name = "Dot4"
+version = "0.1.0"
+defaultTargets = ["dot4"]
+
+[[lean_lib]]
+name = "Dot4"
+
+[[lean_exe]]
+name = "dot4"
+root = "Main"
