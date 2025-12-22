@@ -5,118 +5,119 @@ import Dot4.Record
 /-!
 # DOT DSL Syntax
 
-Custom syntax for defining DOT graphs in Lean.
-
-## Usage
-
-```lean
-open Dot4 in
-def myGraph := dot {
-  digraph "MyGraph"
-  rankdir "LR"
-
-  -- Node/edge defaults
-  node_defaults shape="box" fontname="Arial"
-  edge_defaults arrowsize="0.8"
-
-  -- Subgraphs/clusters
-  cluster "inputs" {
-    label "Inputs"
-    node "A" label="Start"
-    node "B" label="Input"
-  }
-
-  -- Nodes with attributes
-  node "C" label="Process" shape="circle"
-
-  -- Edges with port syntax
-  edge "A" → "C" label="go"
-  edge "B":e → "C":w  -- port syntax
-}
-```
+Custom syntax for defining DOT graphs in Lean using the `dot { ... }` macro.
+Supports nodes, edges, subgraphs, clusters, and graph attributes.
 -/
 
 namespace Dot4
 
--- Attribute syntax: key=value
+/-- Key-value attribute syntax for DOT properties -/
 declare_syntax_cat dotKV
+/-- Attribute assignment: key=value -/
 syntax ident "=" str : dotKV
 
--- Port/compass syntax
+/-- Port and compass point syntax for edge endpoints -/
 declare_syntax_cat dotPort
+/-- Port specification with colon prefix -/
 syntax ":" ident : dotPort
 
--- Node ID with optional port (supports both quoted strings and bare identifiers)
+/-- Node reference with optional port/compass specifications -/
 declare_syntax_cat dotNodeRef
+/-- Node reference with quoted string ID -/
 syntax str : dotNodeRef
+/-- Node reference with port -/
 syntax str dotPort : dotNodeRef
+/-- Node reference with port and compass point -/
 syntax str dotPort dotPort : dotNodeRef
--- Unquoted identifiers (like json% allows)
+/-- Node reference with unquoted identifier -/
 syntax ident : dotNodeRef
+/-- Node reference with unquoted identifier and port -/
 syntax ident dotPort : dotNodeRef
+/-- Node reference with unquoted identifier, port, and compass point -/
 syntax ident dotPort dotPort : dotNodeRef
 
--- Graph element syntax
+/-- Graph element syntax for nodes, edges, subgraphs, and attributes -/
 declare_syntax_cat dotElem
 
--- node "id" key=value ... (quoted or unquoted)
+/-- Node declaration with quoted ID and attributes -/
 syntax "node" str dotKV* : dotElem
+/-- Node declaration with unquoted identifier and attributes -/
 syntax "node" ident dotKV* : dotElem
 
--- edge with various port combinations
+/-- Directed edge with Unicode arrow -/
 syntax "edge" dotNodeRef "→" dotNodeRef dotKV* : dotElem
+/-- Directed edge with ASCII arrow -/
 syntax "edge" dotNodeRef "->" dotNodeRef dotKV* : dotElem
 
--- Bidirectional edges (creates two edges)
+/-- Bidirectional edge with Unicode arrows -/
 syntax "edge" dotNodeRef "↔" dotNodeRef dotKV* : dotElem
+/-- Bidirectional edge with ASCII arrows -/
 syntax "edge" dotNodeRef "<->" dotNodeRef dotKV* : dotElem
 
--- Edge chains: chain "A" → "B" → "C" → "D"
--- Simplified to chain with explicit node list
+/-- Edge chain connecting multiple nodes in sequence -/
 syntax "chain" "[" str,+ "]" dotKV* : dotElem
 
--- Multi-target edges: fanout "hub" → ["a", "b", "c"]
+/-- Fan-out edge from one source to multiple targets with Unicode arrow -/
 syntax "fanout" dotNodeRef "→" "[" str,* "]" dotKV* : dotElem
+/-- Fan-out edge from one source to multiple targets with ASCII arrow -/
 syntax "fanout" dotNodeRef "->" "[" str,* "]" dotKV* : dotElem
 
--- Node/edge defaults
+/-- Default attributes for all subsequent nodes -/
 syntax "node_defaults" dotKV+ : dotElem
+/-- Default attributes for all subsequent edges -/
 syntax "edge_defaults" dotKV+ : dotElem
 
--- Same rank constraint: sameRank ["A", "B", "C"]
+/-- Constraint to align nodes at the same rank -/
 syntax "sameRank" "[" str,* "]" : dotElem
 
--- Record node syntax
+/-- Record field syntax for structured node labels -/
 declare_syntax_cat recordField
-syntax str ":" str : recordField           -- "port" : "label"
-syntax str : recordField                    -- just "label" (no port)
-syntax "{" recordField,* "}" : recordField  -- nested row
+/-- Record field with port name and label -/
+syntax str ":" str : recordField
+/-- Record field with label only -/
+syntax str : recordField
+/-- Nested row of record fields -/
+syntax "{" recordField,* "}" : recordField
 
+/-- Record-shaped node with box corners -/
 syntax "record" str "[" recordField,* "]" dotKV* : dotElem
-syntax "mrecord" str "[" recordField,* "]" dotKV* : dotElem  -- rounded corners
+/-- Record-shaped node with rounded corners -/
+syntax "mrecord" str "[" recordField,* "]" dotKV* : dotElem
 
--- Subgraph/cluster block syntax
+/-- Subgraph element syntax for nodes, edges, and attributes within subgraphs -/
 declare_syntax_cat subgraphElem
+/-- Node declaration with quoted ID inside subgraph -/
 syntax "node" str dotKV* : subgraphElem
-syntax "node" ident dotKV* : subgraphElem  -- unquoted node id
+/-- Node declaration with unquoted ID inside subgraph -/
+syntax "node" ident dotKV* : subgraphElem
+/-- Directed edge with Unicode arrow inside subgraph -/
 syntax "edge" dotNodeRef "→" dotNodeRef dotKV* : subgraphElem
+/-- Directed edge with ASCII arrow inside subgraph -/
 syntax "edge" dotNodeRef "->" dotNodeRef dotKV* : subgraphElem
-syntax "node_defaults" dotKV+ : subgraphElem  -- node defaults in cluster
-syntax "edge_defaults" dotKV+ : subgraphElem  -- edge defaults in cluster
-syntax ident str : subgraphElem  -- subgraph attr like label "foo"
+/-- Node defaults inside subgraph -/
+syntax "node_defaults" dotKV+ : subgraphElem
+/-- Edge defaults inside subgraph -/
+syntax "edge_defaults" dotKV+ : subgraphElem
+/-- Subgraph attribute like label or style -/
+syntax ident str : subgraphElem
 
--- Cluster and subgraph
+/-- Cluster subgraph with visible boundary -/
 syntax "cluster" str "{" subgraphElem* "}" : dotElem
+/-- Plain subgraph without boundary -/
 syntax "subgraph" str "{" subgraphElem* "}" : dotElem
 
--- Graph-level attributes
+/-- Directed graph declaration -/
 syntax "digraph" str : dotElem
+/-- Undirected graph declaration -/
 syntax "graph" str : dotElem
-syntax "strict" "digraph" str : dotElem  -- strict digraph (no multi-edges)
-syntax "strict" "graph" str : dotElem    -- strict graph (no multi-edges)
-syntax ident str : dotElem  -- generic attr like rankdir "TB"
+/-- Strict directed graph (no multi-edges) -/
+syntax "strict" "digraph" str : dotElem
+/-- Strict undirected graph (no multi-edges) -/
+syntax "strict" "graph" str : dotElem
+/-- Generic graph attribute -/
+syntax ident str : dotElem
 
--- Main graph block
+/-- Main DOT graph block syntax -/
 syntax "dot" "{" dotElem* "}" : term
 
 /-- Convert key-value pairs to attribute list with validation -/

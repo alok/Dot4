@@ -4,30 +4,6 @@ import Dot4.Basic
 # Record Node DSL
 
 Type-safe construction of Graphviz record nodes with fields and ports.
-
-## Usage
-
-```lean
-open Dot4 in
--- Simple record with fields
-def myRecord := record "struct" [
-  .field "f0" "left",
-  .field "f1" "middle",
-  .field "f2" "right"
-]
-
--- Nested record with rows
-def nestedRecord := record "table" [
-  .row [.field "a" "top", .field "b" "bottom"],
-  .row [.field "c" "left", .field "d" "right"]
-]
-```
-
-Generates DOT:
-```dot
-struct [shape=record, label="<f0> left|<f1> middle|<f2> right"]
-table [shape=record, label="{<a> top|<b> bottom}|{<c> left|<d> right}"]
-```
 -/
 
 namespace Dot4
@@ -36,7 +12,7 @@ namespace Dot4
 inductive RecordCell where
   /-- A single field with optional port name and label -/
   | field (port : Option String) (label : String)
-  /-- A nested row of cells (renders with {} in DOT) -/
+  /-- A nested row of cells (renders with {lit}`{}` in DOT) -/
   | row (cells : List RecordCell)
   deriving Repr, BEq
 

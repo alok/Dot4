@@ -21,7 +21,7 @@ def escapeString (s : String) : String :=
 def quoted (s : String) : String :=
   quote ++ escapeString s ++ quote
 
-/-- Render attributes list: [key="value", ...] -/
+/-- Render attributes list to DOT format (e.g., `[key="value", ...]`) -/
 def renderAttrs (attrs : List Attr) : String :=
   if attrs.isEmpty then ""
   else

@@ -286,6 +286,7 @@ def fullArchitecture : Graph := dot {
 
 /-! ## Main Entry Point -/
 
+/-- CLI entry point displaying demo graphs -/
 def main : IO Unit := do
   IO.println "╔══════════════════════════════════════════════════════════════╗"
   IO.println "║                    Dot4 - DOT DSL for Lean 4                 ║"

@@ -7,20 +7,7 @@ import ProofWidgets.Component.Basic
 # Dot4 Interactive Widget
 
 Provides interactive graph visualization in the VS Code infoview using viz.js.
-
-## Usage
-
-```lean
-open Dot4 in
-def myGraph := dot {
-  digraph "Example"
-  node "A" label="Hello"
-  node "B" label="World"
-  edge "A" → "B"
-}
-
-#dot myGraph  -- Shows interactive graph in infoview
-```
+Use `#dot myGraph` to render a graph in the infoview panel.
 -/
 
 namespace Dot4
@@ -30,6 +17,7 @@ open ProofWidgets
 
 /-- Props for the Dot4 visualization widget -/
 structure DotWidgetProps where
+  /-- The DOT source code to render -/
   dot : String
   deriving Server.RpcEncodable
 
@@ -55,6 +43,7 @@ This renders the graph using Graphviz (via viz.js) directly in VS Code.
 -/
 syntax (name := showDotCmd) "#dot " term : command
 
+/-- Command elaborator for the #dot command -/
 @[command_elab showDotCmd]
 unsafe def elabShowDotCmd : CommandElab := fun
   | stx@`(#dot $g:term) => do
@@ -67,12 +56,10 @@ unsafe def elabShowDotCmd : CommandElab := fun
       stx
   | stx => throwError "Unexpected syntax {stx}."
 
-/-- Display a raw DOT string in the infoview panel.
-
-Usage: `#dot_raw "digraph { a -> b }"`
--/
+/-- Display a raw DOT string in the infoview panel. -/
 syntax (name := showDotRawCmd) "#dot_raw " str : command
 
+/-- Command elaborator for the {lit}`#dot_raw` command -/
 @[command_elab showDotRawCmd]
 def elabShowDotRawCmd : CommandElab := fun
   | stx@`(#dot_raw $s:str) => do

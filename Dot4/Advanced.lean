@@ -6,10 +6,7 @@ import Dot4.Shapes
 # Advanced DOT DSL Features
 
 Power features that make Lean's DOT DSL better than raw DOT:
-- Edge chains: `chain "A" → "B" → "C" → "D"`
-- Rank constraints: `sameRank ["A", "B", "C"]`
-- Type-safe attributes via shapes/colors
-- Graph transformations
+edge chains, rank constraints, type-safe attributes, and graph transformations.
 -/
 
 namespace Dot4
@@ -147,28 +144,42 @@ def bipartiteGraph (name : String) (left right : List String) : Graph :=
 
 /-- HTML table cell -/
 structure HtmlCell where
+  /-- Cell text content -/
   content : String
+  /-- Optional port name for edge connections -/
   port : Option String := none
+  /-- Number of columns to span -/
   colspan : Option Nat := none
+  /-- Number of rows to span -/
   rowspan : Option Nat := none
+  /-- Background color -/
   bgcolor : Option String := none
+  /-- Text alignment (LEFT, CENTER, RIGHT) -/
   align : Option String := none
 
 /-- HTML table row -/
 structure HtmlRow where
+  /-- Cells in this row -/
   cells : List HtmlCell
 
 /-- HTML table for record-like labels -/
 structure HtmlTable where
+  /-- Table rows -/
   rows : List HtmlRow
+  /-- Outer table border width -/
   border : Nat := 0
+  /-- Cell border width -/
   cellborder : Nat := 1
+  /-- Spacing between cells -/
   cellspacing : Nat := 0
+  /-- Padding inside cells -/
   cellpadding : Nat := 4
+  /-- Table background color -/
   bgcolor : Option String := none
 
 namespace HtmlCell
 
+/-- Render cell as HTML TD element -/
 def toHtml (c : HtmlCell) : String :=
   let portAttr := c.port.map (s!" PORT=\"{·}\"") |>.getD ""
   let colspanAttr := c.colspan.map (s!" COLSPAN=\"{·}\"") |>.getD ""
@@ -181,6 +192,7 @@ end HtmlCell
 
 namespace HtmlRow
 
+/-- Render row as HTML TR element -/
 def toHtml (r : HtmlRow) : String :=
   let cells := r.cells.map HtmlCell.toHtml |> String.join
   s!"<TR>{cells}</TR>"
@@ -189,6 +201,7 @@ end HtmlRow
 
 namespace HtmlTable
 
+/-- Render table as HTML TABLE element with angle bracket wrapper -/
 def toHtml (t : HtmlTable) : String :=
   let bgAttr := t.bgcolor.map (s!" BGCOLOR=\"{·}\"") |>.getD ""
   let rows := t.rows.map HtmlRow.toHtml |> "\n".intercalate

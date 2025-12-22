@@ -2,7 +2,14 @@ import Lake
 open Lake DSL
 
 package Dot4 where
-  moreLeanArgs := #["-DautoImplicit=false"]
+  leanOptions := #[
+    ⟨`pp.unicode.fun, true⟩,
+    ⟨`autoImplicit, true⟩,
+    ⟨`relaxedAutoImplicit, false⟩,
+    ⟨`linter.missingDocs, true⟩,
+    ⟨`doc.verso, true⟩
+  ]
+
 
 require proofwidgets from git
   "https://github.com/leanprover-community/ProofWidgets4" @ "v0.0.83"

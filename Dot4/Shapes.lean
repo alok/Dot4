@@ -1,84 +1,94 @@
 import Dot4.Basic
 
 /-!
-# Type-Safe Shapes for DOT
+# Type-Safe Shapes and Enums for DOT
 
-All valid Graphviz node shapes as an inductive type.
-No more typos like `shape="circl"` - the compiler catches it!
+Type-safe representations of Graphviz enumerated attributes.
+No more typos like {lit}`shape="circl"` - the compiler catches it!
+
+See:
+- [Node Shapes](https://graphviz.org/doc/info/shapes.html)
+- [Arrow Shapes](https://graphviz.org/doc/info/arrows.html)
+- [Attributes](https://graphviz.org/doc/info/attrs.html)
 -/
 
 namespace Dot4
 
-/-- All valid Graphviz node shapes -/
+-- Enum constructors match DOT values exactly, so they're self-documenting
+set_option linter.missingDocs false
+
+/-- All valid Graphviz node shapes.
+See <https://graphviz.org/doc/info/shapes.html> -/
 inductive Shape where
   -- Polygon-based shapes
-  | box
-  | polygon
-  | ellipse
-  | oval
-  | circle
-  | point
-  | egg
-  | triangle
-  | plaintext
-  | plain
-  | diamond
-  | trapezium
-  | parallelogram
-  | house
-  | pentagon
-  | hexagon
-  | septagon
-  | octagon
-  | doublecircle
-  | doubleoctagon
-  | tripleoctagon
-  | invtriangle
-  | invtrapezium
-  | invhouse
-  | Mdiamond
-  | Msquare
-  | Mcircle
+  /-- Rectangular box shape -/ | box
+  /-- Regular polygon shape -/ | polygon
+  /-- Ellipse shape -/ | ellipse
+  /-- Oval shape (synonym for ellipse) -/ | oval
+  /-- Circular shape -/ | circle
+  /-- Point shape (single pixel) -/ | point
+  /-- Egg shape -/ | egg
+  /-- Triangle shape -/ | triangle
+  /-- Plain text with no border -/ | plaintext
+  /-- Plain text (synonym for plaintext) -/ | plain
+  /-- Diamond shape -/ | diamond
+  /-- Trapezium shape -/ | trapezium
+  /-- Parallelogram shape -/ | parallelogram
+  /-- House shape (pentagon with flat base) -/ | house
+  /-- Pentagon shape -/ | pentagon
+  /-- Hexagon shape -/ | hexagon
+  /-- Septagon (7-sided polygon) -/ | septagon
+  /-- Octagon shape -/ | octagon
+  /-- Double circle outline -/ | doublecircle
+  /-- Double octagon outline -/ | doubleoctagon
+  /-- Triple octagon outline -/ | tripleoctagon
+  /-- Inverted triangle (pointing down) -/ | invtriangle
+  /-- Inverted trapezium -/ | invtrapezium
+  /-- Inverted house -/ | invhouse
+  /-- Diamond with Mrecord margins -/ | Mdiamond
+  /-- Square with Mrecord margins -/ | Msquare
+  /-- Circle with Mrecord margins -/ | Mcircle
   -- Record shapes
-  | record
-  | Mrecord
+  /-- Record-based node with horizontal/vertical layout -/ | record
+  /-- Record with rounded corners -/ | Mrecord
   -- Special shapes
-  | rect
-  | rectangle
-  | square
-  | star
-  | none
-  | underline
-  | cylinder
-  | note
-  | tab
-  | folder
-  | box3d
-  | component
-  | promoter
-  | cds
-  | terminator
-  | utr
-  | primersite
-  | restrictionsite
-  | fivepoverhang
-  | threepoverhang
-  | noverhang
-  | assembly
-  | signature
-  | insulator
-  | ribosite
-  | rnastab
-  | proteasesite
-  | proteinstab
-  | rpromoter
-  | rarrow
-  | larrow
-  | lpromoter
+  /-- Rectangle (synonym for box) -/ | rect
+  /-- Rectangle (synonym for box) -/ | rectangle
+  /-- Square shape -/ | square
+  /-- Star shape -/ | star
+  /-- No shape (invisible) -/ | none
+  /-- Underline shape -/ | underline
+  /-- Cylinder shape -/ | cylinder
+  /-- Note shape (dog-eared rectangle) -/ | note
+  /-- Folder tab shape -/ | tab
+  /-- Folder shape -/ | folder
+  /-- 3D box with perspective -/ | box3d
+  /-- Component shape (UML) -/ | component
+  /-- Promoter shape (molecular biology) -/ | promoter
+  /-- Coding sequence shape (molecular biology) -/ | cds
+  /-- Terminator shape (molecular biology) -/ | terminator
+  /-- Untranslated region shape (molecular biology) -/ | utr
+  /-- Primer binding site shape (molecular biology) -/ | primersite
+  /-- Restriction site shape (molecular biology) -/ | restrictionsite
+  /-- 5' overhang shape (molecular biology) -/ | fivepoverhang
+  /-- 3' overhang shape (molecular biology) -/ | threepoverhang
+  /-- No overhang shape (molecular biology) -/ | noverhang
+  /-- Assembly shape (molecular biology) -/ | assembly
+  /-- Signature shape (molecular biology) -/ | signature
+  /-- Insulator shape (molecular biology) -/ | insulator
+  /-- Ribosome binding site shape (molecular biology) -/ | ribosite
+  /-- RNA stability element shape (molecular biology) -/ | rnastab
+  /-- Protease site shape (molecular biology) -/ | proteasesite
+  /-- Protein stability element shape (molecular biology) -/ | proteinstab
+  /-- Right-facing promoter shape (molecular biology) -/ | rpromoter
+  /-- Right-facing arrow shape (molecular biology) -/ | rarrow
+  /-- Left-facing arrow shape (molecular biology) -/ | larrow
+  /-- Left-facing promoter shape (molecular biology) -/ | lpromoter
   deriving Repr, BEq, Hashable
 
 namespace Shape
 
+/-- Convert a Shape to its DOT string representation -/
 def toString : Shape → String
   | box => "box"
   | polygon => "polygon"
@@ -208,7 +218,7 @@ def fromString? (s : String) : Option Shape :=
   | "lpromoter" => some lpromoter
   | _ => Option.none
 
-/-- List of all valid shape names for error messages -/
+/-- List of all valid shape names as strings -/
 def allNames : List String := [
   "box", "polygon", "ellipse", "oval", "circle", "point", "egg", "triangle",
   "plaintext", "plain", "diamond", "trapezium", "parallelogram", "house",
@@ -224,28 +234,30 @@ def allNames : List String := [
 
 end Shape
 
-/-- Arrow head/tail shapes -/
+/-- Arrow head/tail shapes.
+See <https://graphviz.org/doc/info/arrows.html> -/
 inductive ArrowShape where
-  | box
-  | crow
-  | curve
-  | icurve
-  | diamond
-  | dot
-  | inv
-  | none
-  | normal
-  | tee
-  | vee
-  | odot
-  | invdot
-  | invodot
-  | obox
-  | odiamond
+  /-- Box arrow head -/ | box
+  /-- Crow's foot arrow (multiple lines) -/ | crow
+  /-- Curved arrow -/ | curve
+  /-- Inverted curve arrow -/ | icurve
+  /-- Diamond arrow head -/ | diamond
+  /-- Dot (filled circle) arrow -/ | dot
+  /-- Inverted arrow head -/ | inv
+  /-- No arrow head -/ | none
+  /-- Normal arrow head (default) -/ | normal
+  /-- Tee arrow (perpendicular line) -/ | tee
+  /-- Vee arrow (open triangle) -/ | vee
+  /-- Outlined dot arrow -/ | odot
+  /-- Inverted filled dot -/ | invdot
+  /-- Inverted outlined dot -/ | invodot
+  /-- Outlined box arrow -/ | obox
+  /-- Outlined diamond arrow -/ | odiamond
   deriving Repr, BEq
 
 namespace ArrowShape
 
+/-- Convert an ArrowShape to its DOT string representation -/
 def toString : ArrowShape → String
   | box => "box"
   | crow => "crow"
@@ -264,6 +276,7 @@ def toString : ArrowShape → String
   | obox => "obox"
   | odiamond => "odiamond"
 
+/-- Parse a string to an ArrowShape, returning none if invalid -/
 def fromString? (s : String) : Option ArrowShape :=
   match s with
   | "box" => some box
@@ -284,6 +297,7 @@ def fromString? (s : String) : Option ArrowShape :=
   | "odiamond" => some odiamond
   | _ => Option.none
 
+/-- List of all valid arrow shape names as strings -/
 def allNames : List String := [
   "box", "crow", "curve", "icurve", "diamond", "dot", "inv", "none",
   "normal", "tee", "vee", "odot", "invdot", "invodot", "obox", "odiamond"
@@ -293,19 +307,21 @@ end ArrowShape
 
 /-- Edge direction for arrow display -/
 inductive EdgeDir where
-  | forward
-  | back
-  | both
-  | none
+  /-- Arrow points from tail to head (default) -/ | forward
+  /-- Arrow points from head to tail -/ | back
+  /-- Arrows point in both directions -/ | both
+  /-- No arrows -/ | none
   deriving Repr, BEq
 
 namespace EdgeDir
+/-- Convert an EdgeDir to its DOT string representation -/
 def toString : EdgeDir → String
   | forward => "forward"
   | back => "back"
   | both => "both"
   | none => "none"
 
+/-- Parse a string to an EdgeDir, returning none if invalid -/
 def fromString? (s : String) : Option EdgeDir :=
   match s with
   | "forward" => some forward
@@ -314,24 +330,27 @@ def fromString? (s : String) : Option EdgeDir :=
   | "none" => some none
   | _ => Option.none
 
+/-- List of all valid edge direction names as strings -/
 def allNames : List String := ["forward", "back", "both", "none"]
 end EdgeDir
 
 /-- Rank direction for graph layout -/
 inductive RankDir where
-  | TB  -- top to bottom
-  | BT  -- bottom to top
-  | LR  -- left to right
-  | RL  -- right to left
+  /-- Top to bottom layout -/ | TB
+  /-- Bottom to top layout -/ | BT
+  /-- Left to right layout -/ | LR
+  /-- Right to left layout -/ | RL
   deriving Repr, BEq
 
 namespace RankDir
+/-- Convert a RankDir to its DOT string representation -/
 def toString : RankDir → String
   | TB => "TB"
   | BT => "BT"
   | LR => "LR"
   | RL => "RL"
 
+/-- Parse a string to a RankDir, returning none if invalid -/
 def fromString? (s : String) : Option RankDir :=
   match s with
   | "TB" => some TB
@@ -340,26 +359,28 @@ def fromString? (s : String) : Option RankDir :=
   | "RL" => some RL
   | _ => Option.none
 
+/-- List of all valid rank direction names as strings -/
 def allNames : List String := ["TB", "BT", "LR", "RL"]
 end RankDir
 
 -- RankType is defined in Basic.lean (used by Subgraph)
 
-/-- Node style -/
+/-- Node style attributes -/
 inductive NodeStyle where
-  | solid
-  | dashed
-  | dotted
-  | bold
-  | rounded
-  | diagonals
-  | filled
-  | striped
-  | wedged
-  | invis
+  /-- Solid outline (default) -/ | solid
+  /-- Dashed outline -/ | dashed
+  /-- Dotted outline -/ | dotted
+  /-- Bold outline -/ | bold
+  /-- Rounded corners -/ | rounded
+  /-- Diagonal corner lines -/ | diagonals
+  /-- Filled with background color -/ | filled
+  /-- Striped fill pattern -/ | striped
+  /-- Wedged fill pattern -/ | wedged
+  /-- Invisible node -/ | invis
   deriving Repr, BEq
 
 namespace NodeStyle
+/-- Convert a NodeStyle to its DOT string representation -/
 def toString : NodeStyle → String
   | solid => "solid"
   | dashed => "dashed"
@@ -372,6 +393,7 @@ def toString : NodeStyle → String
   | wedged => "wedged"
   | invis => "invis"
 
+/-- Parse a string to a NodeStyle, returning none if invalid -/
 def fromString? (s : String) : Option NodeStyle :=
   match s with
   | "solid" => some solid
@@ -386,26 +408,29 @@ def fromString? (s : String) : Option NodeStyle :=
   | "invis" => some invis
   | _ => Option.none
 
+/-- List of all valid node style names as strings -/
 def allNames : List String := [
   "solid", "dashed", "dotted", "bold", "rounded",
   "diagonals", "filled", "striped", "wedged", "invis"
 ]
 
+/-- Combine multiple node styles into a comma-separated string -/
 def combine (styles : List NodeStyle) : String :=
   ",".intercalate (styles.map toString)
 end NodeStyle
 
-/-- Edge style -/
+/-- Edge style attributes -/
 inductive EdgeStyle where
-  | solid
-  | dashed
-  | dotted
-  | bold
-  | invis
-  | tapered
+  /-- Solid line (default) -/ | solid
+  /-- Dashed line -/ | dashed
+  /-- Dotted line -/ | dotted
+  /-- Bold line -/ | bold
+  /-- Invisible edge -/ | invis
+  /-- Tapered line (width varies) -/ | tapered
   deriving Repr, BEq
 
 namespace EdgeStyle
+/-- Convert an EdgeStyle to its DOT string representation -/
 def toString : EdgeStyle → String
   | solid => "solid"
   | dashed => "dashed"
@@ -414,6 +439,7 @@ def toString : EdgeStyle → String
   | invis => "invis"
   | tapered => "tapered"
 
+/-- Parse a string to an EdgeStyle, returning none if invalid -/
 def fromString? (s : String) : Option EdgeStyle :=
   match s with
   | "solid" => some solid
@@ -424,23 +450,26 @@ def fromString? (s : String) : Option EdgeStyle :=
   | "tapered" => some tapered
   | _ => Option.none
 
+/-- List of all valid edge style names as strings -/
 def allNames : List String := ["solid", "dashed", "dotted", "bold", "invis", "tapered"]
 
+/-- Combine multiple edge styles into a comma-separated string -/
 def combine (styles : List EdgeStyle) : String :=
   ",".intercalate (styles.map toString)
 end EdgeStyle
 
 /-- Spline type for edge routing -/
 inductive SplineType where
-  | none
-  | line
-  | polyline
-  | curved
-  | ortho
-  | spline
+  /-- No edge routing -/ | none
+  /-- Straight line routing -/ | line
+  /-- Polyline routing (straight segments) -/ | polyline
+  /-- Curved bezier spline routing -/ | curved
+  /-- Orthogonal routing (right angles) -/ | ortho
+  /-- Spline routing (default) -/ | spline
   deriving Repr, BEq
 
 namespace SplineType
+/-- Convert a SplineType to its DOT string representation -/
 def toString : SplineType → String
   | none => "none"
   | line => "line"
@@ -449,6 +478,7 @@ def toString : SplineType → String
   | ortho => "ortho"
   | spline => "spline"
 
+/-- Parse a string to a SplineType, returning none if invalid -/
 def fromString? (s : String) : Option SplineType :=
   match s with
   | "none" => some none
@@ -459,22 +489,25 @@ def fromString? (s : String) : Option SplineType :=
   | "spline" => some spline
   | _ => Option.none
 
+/-- List of all valid spline type names as strings -/
 def allNames : List String := ["none", "line", "polyline", "curved", "ortho", "spline"]
 end SplineType
 
 /-- Output order for rendering -/
 inductive OutputMode where
-  | breadthfirst
-  | nodesfirst
-  | edgesfirst
+  /-- Breadth-first traversal order -/ | breadthfirst
+  /-- Render all nodes before edges -/ | nodesfirst
+  /-- Render all edges before nodes -/ | edgesfirst
   deriving Repr, BEq
 
 namespace OutputMode
+/-- Convert an OutputMode to its DOT string representation -/
 def toString : OutputMode → String
   | breadthfirst => "breadthfirst"
   | nodesfirst => "nodesfirst"
   | edgesfirst => "edgesfirst"
 
+/-- Parse a string to an OutputMode, returning none if invalid -/
 def fromString? (s : String) : Option OutputMode :=
   match s with
   | "breadthfirst" => some breadthfirst
@@ -482,6 +515,7 @@ def fromString? (s : String) : Option OutputMode :=
   | "edgesfirst" => some edgesfirst
   | _ => Option.none
 
+/-- List of all valid output mode names as strings -/
 def allNames : List String := ["breadthfirst", "nodesfirst", "edgesfirst"]
 end OutputMode
 
@@ -489,17 +523,18 @@ end OutputMode
 
 /-- Layout engine selection -/
 inductive LayoutEngine where
-  | dot      -- hierarchical/directed graphs
-  | neato    -- spring model, undirected
-  | twopi    -- radial layout
-  | circo    -- circular layout
-  | fdp      -- force-directed placement
-  | sfdp     -- scalable force-directed
-  | osage    -- array-based layout
-  | patchwork -- squarified treemaps
+  /-- Hierarchical layout for directed graphs -/ | dot
+  /-- Spring model layout for undirected graphs -/ | neato
+  /-- Radial layout -/ | twopi
+  /-- Circular layout -/ | circo
+  /-- Force-directed placement -/ | fdp
+  /-- Scalable force-directed placement -/ | sfdp
+  /-- Array-based layout -/ | osage
+  /-- Squarified treemap layout -/ | patchwork
   deriving Repr, BEq
 
 namespace LayoutEngine
+/-- Convert a LayoutEngine to its DOT string representation -/
 def toString : LayoutEngine → String
   | dot => "dot"
   | neato => "neato"
@@ -510,6 +545,7 @@ def toString : LayoutEngine → String
   | osage => "osage"
   | patchwork => "patchwork"
 
+/-- Parse a string to a LayoutEngine, returning none if invalid -/
 def fromString? (s : String) : Option LayoutEngine :=
   match s with
   | "dot" => some dot
@@ -522,26 +558,28 @@ def fromString? (s : String) : Option LayoutEngine :=
   | "patchwork" => some patchwork
   | _ => Option.none
 
+/-- List of all valid layout engine names as strings -/
 def allNames : List String := ["dot", "neato", "twopi", "circo", "fdp", "sfdp", "osage", "patchwork"]
 end LayoutEngine
 
 /-- Overlap removal mode for layouts -/
 inductive OverlapMode where
-  | «true»    -- allow overlap
-  | «false»   -- remove overlap
-  | scale     -- scale to avoid overlap
-  | scalexy   -- scale separately in X and Y
-  | ortho     -- orthogonal projection
-  | orthoxy   -- ortho in X first
-  | orthoyx   -- ortho in Y first
-  | compress  -- compress after overlap removal
-  | vpsc      -- variable placement with constraints
-  | voronoi   -- voronoi-based
-  | ipsep     -- iterative proximity separation
-  | prism     -- proximity graph-based
+  /-- Allow overlap -/ | «true»
+  /-- Remove overlap -/ | «false»
+  /-- Scale uniformly to avoid overlap -/ | scale
+  /-- Scale separately in X and Y -/ | scalexy
+  /-- Orthogonal projection overlap removal -/ | ortho
+  /-- Orthogonal in X direction first -/ | orthoxy
+  /-- Orthogonal in Y direction first -/ | orthoyx
+  /-- Compress after overlap removal -/ | compress
+  /-- Variable placement with separation constraints -/ | vpsc
+  /-- Voronoi-based overlap removal -/ | voronoi
+  /-- Iterative proximity separation -/ | ipsep
+  /-- Proximity graph-based overlap removal -/ | prism
   deriving Repr, BEq
 
 namespace OverlapMode
+/-- Convert an OverlapMode to its DOT string representation -/
 def toString : OverlapMode → String
   | «true» => "true"
   | «false» => "false"
@@ -556,6 +594,7 @@ def toString : OverlapMode → String
   | ipsep => "ipsep"
   | prism => "prism"
 
+/-- Parse a string to an OverlapMode, returning none if invalid -/
 def fromString? (s : String) : Option OverlapMode :=
   match s with
   | "true" => some «true»
@@ -572,6 +611,7 @@ def fromString? (s : String) : Option OverlapMode :=
   | "prism" => some prism
   | _ => Option.none
 
+/-- List of all valid overlap mode names as strings -/
 def allNames : List String := [
   "true", "false", "scale", "scalexy", "ortho", "orthoxy",
   "orthoyx", "compress", "vpsc", "voronoi", "ipsep", "prism"
@@ -580,17 +620,19 @@ end OverlapMode
 
 /-- Label location for graph/cluster labels -/
 inductive LabelLoc where
-  | t  -- top
-  | c  -- center
-  | b  -- bottom
+  /-- Top placement -/ | t
+  /-- Center placement -/ | c
+  /-- Bottom placement -/ | b
   deriving Repr, BEq
 
 namespace LabelLoc
+/-- Convert a LabelLoc to its DOT string representation -/
 def toString : LabelLoc → String
   | t => "t"
   | c => "c"
   | b => "b"
 
+/-- Parse a string to a LabelLoc, returning none if invalid -/
 def fromString? (s : String) : Option LabelLoc :=
   match s with
   | "t" => some t
@@ -601,22 +643,25 @@ def fromString? (s : String) : Option LabelLoc :=
   | "bottom" => some b
   | _ => Option.none
 
+/-- List of all valid label location names as strings -/
 def allNames : List String := ["t", "c", "b"]
 end LabelLoc
 
 /-- Label justification -/
 inductive LabelJust where
-  | l  -- left
-  | c  -- center
-  | r  -- right
+  /-- Left justification -/ | l
+  /-- Center justification -/ | c
+  /-- Right justification -/ | r
   deriving Repr, BEq
 
 namespace LabelJust
+/-- Convert a LabelJust to its DOT string representation -/
 def toString : LabelJust → String
   | l => "l"
   | c => "c"
   | r => "r"
 
+/-- Parse a string to a LabelJust, returning none if invalid -/
 def fromString? (s : String) : Option LabelJust :=
   match s with
   | "l" => some l
@@ -627,22 +672,25 @@ def fromString? (s : String) : Option LabelJust :=
   | "right" => some r
   | _ => Option.none
 
+/-- List of all valid label justification names as strings -/
 def allNames : List String := ["l", "c", "r"]
 end LabelJust
 
 /-- Cluster mode for compound graphs -/
 inductive ClusterMode where
-  | «local»   -- clusters are local
-  | global    -- clusters share namespace
-  | «none»    -- no special cluster handling
+  /-- Clusters use local namespace -/ | «local»
+  /-- Clusters share global namespace -/ | global
+  /-- No special cluster handling -/ | «none»
   deriving Repr, BEq
 
 namespace ClusterMode
+/-- Convert a ClusterMode to its DOT string representation -/
 def toString : ClusterMode → String
   | «local» => "local"
   | global => "global"
   | «none» => "none"
 
+/-- Parse a string to a ClusterMode, returning none if invalid -/
 def fromString? (s : String) : Option ClusterMode :=
   match s with
   | "local" => some «local»
@@ -650,6 +698,7 @@ def fromString? (s : String) : Option ClusterMode :=
   | "none" => some «none»
   | _ => Option.none
 
+/-- List of all valid cluster mode names as strings -/
 def allNames : List String := ["local", "global", "none"]
 end ClusterMode
 

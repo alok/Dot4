@@ -4,19 +4,8 @@ import Dot4.Advanced
 /-!
 # Graph Validation Helpers
 
-Utilities for validating and analyzing graphs.
-
-## Usage
-
-```lean
-open Dot4 in
-def g := dot { ... }
-
-#eval g.isDAG          -- Check for cycles (directed graphs)
-#eval g.validate       -- Get list of validation errors
-#eval g.sources        -- Nodes with no incoming edges
-#eval g.sinks          -- Nodes with no outgoing edges
-```
+Utilities for validating and analyzing graphs including DAG checking,
+node degree analysis, and structural validation.
 -/
 
 namespace Dot4
@@ -68,16 +57,21 @@ partial def isDAG (g : Graph) : Bool :=
     (false, [])
   !hasCycleResult
 
-/-- Validation error type -/
+/-- Validation errors that can be detected in a graph -/
 inductive ValidationError where
+  /-- An edge references a node that doesn't exist -/
   | danglingEdge (src : String) (dst : String) (missing : String)
+  /-- Multiple nodes share the same ID -/
   | duplicateNode (id : String)
+  /-- A node has an empty string as its ID -/
   | emptyNodeId
+  /-- The graph contains a cycle (for DAG validation) -/
   | cyclicGraph (msg : String)
   deriving Repr, BEq
 
 namespace ValidationError
 
+/-- Convert a validation error to a human-readable message -/
 def toString : ValidationError → String
   | danglingEdge src dst missing =>
     s!"Edge '{src}' → '{dst}' references undefined node '{missing}'"
