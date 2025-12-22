@@ -137,6 +137,148 @@ def inDegree (g : Graph) (id : String) : Nat :=
 def outDegree (g : Graph) (id : String) : Nat :=
   (g.successors id).length
 
+/-- Topological sort using Kahn's algorithm. Returns None if graph has cycles. -/
+partial def topologicalSort (g : Graph) : Option (List String) :=
+  let allNodes := g.getNodeIds
+  -- Start with nodes that have no incoming edges
+  let queue := allNodes.filter (fun n => g.inDegree n == 0)
+  -- Track in-degrees as list of pairs
+  let inDegrees := allNodes.map (fun n => (n, g.inDegree n))
+  -- Helper to lookup in-degree
+  let getDeg (degrees : List (String × Nat)) (n : String) : Nat :=
+    match degrees.find? (fun p => p.1 == n) with
+    | some (_, d) => d
+    | none => 0
+  -- Helper to update in-degree
+  let setDeg (degrees : List (String × Nat)) (n : String) (d : Nat) : List (String × Nat) :=
+    degrees.map (fun p => if p.1 == n then (n, d) else p)
+  -- Process queue
+  let rec process (q : List String) (result : List String)
+                  (degrees : List (String × Nat)) : Option (List String) :=
+    match q with
+    | [] =>
+      -- If we processed all nodes, return result; otherwise there's a cycle
+      if result.length == allNodes.length then some result.reverse
+      else none
+    | curr :: rest =>
+      let succs := g.successors curr
+      -- Decrease in-degree of successors
+      let (newDegrees, newQueue) := succs.foldl
+        (fun (acc : List (String × Nat) × List String) succ =>
+          let (degs, q') := acc
+          let deg := getDeg degs succ
+          if deg != 0 then
+            let newDeg := deg - 1
+            let newDegs := setDeg degs succ newDeg
+            if newDeg == 0 then (newDegs, succ :: q')
+            else (newDegs, q')
+          else acc)
+        (degrees, rest)
+      process newQueue (curr :: result) newDegrees
+  process queue [] inDegrees
+
+/-- Find all nodes reachable from a given node using BFS -/
+partial def reachable (g : Graph) (startId : String) : List String :=
+  let rec bfs (queue : List String) (visited : List String) : List String :=
+    match queue with
+    | [] => visited
+    | curr :: rest =>
+      if visited.contains curr then bfs rest visited
+      else
+        let succs := g.successors curr
+        let newNodes := succs.filter (fun s => !visited.contains s && !queue.contains s)
+        bfs (rest ++ newNodes) (curr :: visited)
+  if g.getNodeIds.contains startId then bfs [startId] []
+  else []
+
+/-- Find shortest path between two nodes using BFS. Returns None if no path exists. -/
+partial def shortestPath (g : Graph) (startId endId : String) : Option (List String) :=
+  if startId == endId then some [startId]
+  else
+    -- Helper to find parent in list
+    let findParent (parents : List (String × String)) (n : String) : Option String :=
+      match parents.find? (fun p => p.1 == n) with
+      | some (_, p) => some p
+      | none => none
+    -- BFS with parent tracking as list of pairs
+    let rec bfs (queue : List String) (visited : List String)
+                (parents : List (String × String)) : Option (List String) :=
+      match queue with
+      | [] => none  -- No path found
+      | curr :: rest =>
+        if curr == endId then
+          -- Reconstruct path
+          let rec buildPath (c : String) (path : List String) : List String :=
+            match findParent parents c with
+            | none => c :: path
+            | some p => buildPath p (c :: path)
+          some (buildPath endId [])
+        else if visited.contains curr then bfs rest visited parents
+        else
+          let succs := g.successors curr
+          let (newQueue, newParents) := succs.foldl
+            (fun (acc : List String × List (String × String)) succ =>
+              let (q, pars) := acc
+              let inParents := pars.any (fun p => p.1 == succ)
+              if visited.contains succ || q.contains succ || inParents
+              then acc
+              else (q ++ [succ], (succ, curr) :: pars))
+            (rest, parents)
+          bfs newQueue (curr :: visited) newParents
+    if g.getNodeIds.contains startId && g.getNodeIds.contains endId
+    then bfs [startId] [] []
+    else none
+
+/-- Find strongly connected components using Kosaraju's algorithm -/
+partial def stronglyConnectedComponents (g : Graph) : List (List String) :=
+  let allNodes := g.getNodeIds
+  -- First pass: DFS to get finish order
+  let rec dfs1 (curr : String) (visited : List String) (stack : List String)
+              : List String × List String :=
+    if visited.contains curr then (visited, stack)
+    else
+      let newVisited := curr :: visited
+      let (finalVisited, afterSuccs) := (g.successors curr).foldl
+        (fun (acc : List String × List String) succ =>
+          let (v, s) := acc
+          dfs1 succ v s)
+        (newVisited, stack)
+      (finalVisited, curr :: afterSuccs)
+
+  let (_, finishOrder) := allNodes.foldl
+    (fun (acc : List String × List String) n =>
+      let (v, s) := acc
+      dfs1 n v s)
+    ([], [])
+
+  -- Build reverse graph edges
+  let reverseSuccessors (nodeId : String) : List String :=
+    g.edgePairs.filterMap fun (src, dst) =>
+      if dst == nodeId then some src else none
+
+  -- Second pass: DFS on reverse graph in finish order
+  let rec dfs2 (curr : String) (visited : List String) (component : List String)
+              : List String × List String :=
+    if visited.contains curr then (visited, component)
+    else
+      let newVisited := curr :: visited
+      let newComponent := curr :: component
+      (reverseSuccessors curr).foldl
+        (fun (acc : List String × List String) pred =>
+          let (v, c) := acc
+          dfs2 pred v c)
+        (newVisited, newComponent)
+
+  let (_, sccs) := finishOrder.foldl
+    (fun (acc : List String × List (List String)) n =>
+      let (visited, components) := acc
+      if visited.contains n then acc
+      else
+        let (newVisited, component) := dfs2 n visited []
+        (newVisited, component :: components))
+    ([], [])
+  sccs
+
 end Graph
 
 end Dot4

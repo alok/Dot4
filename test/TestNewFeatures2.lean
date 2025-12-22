@@ -213,5 +213,48 @@ def testFdpLayout : Graph :=
 
 #eval IO.println testFdpLayout.toDot
 
+-- Test graph algorithms
+def testGraphAlgorithms : IO Unit := do
+  -- Build a simple DAG: A -> B -> C -> D, A -> C
+  let dag := Graph.digraph "DAG"
+    |>.addNode { id := "A", label := some "A" }
+    |>.addNode { id := "B", label := some "B" }
+    |>.addNode { id := "C", label := some "C" }
+    |>.addNode { id := "D", label := some "D" }
+    |>.addEdge { src := "A", dst := "B" }
+    |>.addEdge { src := "B", dst := "C" }
+    |>.addEdge { src := "C", dst := "D" }
+    |>.addEdge { src := "A", dst := "C" }
+
+  -- Test topological sort
+  IO.println s!"DAG: {dag.isDAG}"
+  match dag.topologicalSort with
+  | some order => IO.println s!"Topological order: {order}"
+  | none => IO.println "Has cycle!"
+
+  -- Test reachability
+  IO.println s!"Reachable from A: {dag.reachable \"A\"}"
+
+  -- Test shortest path
+  match dag.shortestPath "A" "D" with
+  | some path => IO.println s!"Shortest path A->D: {path}"
+  | none => IO.println "No path!"
+
+  -- Test SCC on a graph with cycles
+  let cyclic := Graph.digraph "Cyclic"
+    |>.addNode { id := "1" }
+    |>.addNode { id := "2" }
+    |>.addNode { id := "3" }
+    |>.addNode { id := "4" }
+    |>.addEdge { src := "1", dst := "2" }
+    |>.addEdge { src := "2", dst := "3" }
+    |>.addEdge { src := "3", dst := "1" }  -- cycle 1-2-3
+    |>.addEdge { src := "3", dst := "4" }
+
+  IO.println s!"Cyclic graph DAG: {cyclic.isDAG}"
+  IO.println s!"SCCs: {cyclic.stronglyConnectedComponents}"
+
+#eval testGraphAlgorithms
+
 -- All tests pass if this file compiles
 #check "All new features compile successfully!"
