@@ -343,34 +343,7 @@ def fromString? (s : String) : Option RankDir :=
 def allNames : List String := ["TB", "BT", "LR", "RL"]
 end RankDir
 
-/-- Rank type for subgraph ranking -/
-inductive RankType where
-  | same
-  | min
-  | source
-  | max
-  | sink
-  deriving Repr, BEq
-
-namespace RankType
-def toString : RankType → String
-  | same => "same"
-  | min => "min"
-  | source => "source"
-  | max => "max"
-  | sink => "sink"
-
-def fromString? (s : String) : Option RankType :=
-  match s with
-  | "same" => some same
-  | "min" => some min
-  | "source" => some source
-  | "max" => some max
-  | "sink" => some sink
-  | _ => Option.none
-
-def allNames : List String := ["same", "min", "source", "max", "sink"]
-end RankType
+-- RankType is defined in Basic.lean (used by Subgraph)
 
 /-- Node style -/
 inductive NodeStyle where

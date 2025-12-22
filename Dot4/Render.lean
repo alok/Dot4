@@ -65,9 +65,19 @@ def renderEdge (e : Edge) (directed : Bool) (indent : String := "    ") : String
 /-- Render a subgraph -/
 def renderSubgraph (sg : Subgraph) (directed : Bool) : Array String :=
   let lines := #["    subgraph " ++ quoted sg.name ++ " {"]
+  -- Rank constraint (e.g., rank=same)
+  let lines := match sg.rank with
+    | some r => lines.push ("        rank=" ++ r.toString ++ ";")
+    | none => lines
   -- Subgraph attributes
   let lines := sg.attrs.foldl (fun acc a =>
     acc.push ("        " ++ a.key ++ "=" ++ quoted a.value ++ ";")) lines
+  -- Node defaults within this subgraph
+  let lines := if sg.nodeDefaults.isEmpty then lines
+    else lines.push ("        node" ++ renderAttrs sg.nodeDefaults ++ ";")
+  -- Edge defaults within this subgraph
+  let lines := if sg.edgeDefaults.isEmpty then lines
+    else lines.push ("        edge" ++ renderAttrs sg.edgeDefaults ++ ";")
   -- Nodes
   let lines := sg.nodes.foldl (fun acc n =>
     acc.push (renderNode n "        ")) lines

@@ -163,9 +163,9 @@ def test07_colors : Graph :=
   |>.withAttr (Attr.rankdirT RankDir.LR)
   |>.withAttr (Attr.bgcolorC Color.nordPolarNight0)
   |>.addNode n1 |>.addNode n2 |>.addNode n3 |>.addNode n4
-  |>.addEdge (Edge.mk "nord1" "nord2" {} {} none [Attr.colorC Color.nordFrost2])
-  |>.addEdge (Edge.mk "nord2" "solar" {} {} none [Attr.colorC Color.solarizedCyan])
-  |>.addEdge (Edge.mk "solar" "cat" {} {} none [Attr.colorC Color.catppuccinPink])
+  |>.addEdge { src := "nord1", dst := "nord2", attrs := [Attr.colorC Color.nordFrost2] }
+  |>.addEdge { src := "nord2", dst := "solar", attrs := [Attr.colorC Color.solarizedCyan] }
+  |>.addEdge { src := "solar", dst := "cat", attrs := [Attr.colorC Color.catppuccinPink] }
 
 /-- Test 8: Arrow shapes -/
 def test08_arrows : Graph :=

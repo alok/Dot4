@@ -45,17 +45,22 @@ syntax ident "=" str : dotKV
 declare_syntax_cat dotPort
 syntax ":" ident : dotPort
 
--- Node ID with optional port
+-- Node ID with optional port (supports both quoted strings and bare identifiers)
 declare_syntax_cat dotNodeRef
 syntax str : dotNodeRef
 syntax str dotPort : dotNodeRef
 syntax str dotPort dotPort : dotNodeRef
+-- Unquoted identifiers (like json% allows)
+syntax ident : dotNodeRef
+syntax ident dotPort : dotNodeRef
+syntax ident dotPort dotPort : dotNodeRef
 
 -- Graph element syntax
 declare_syntax_cat dotElem
 
--- node "id" key=value ...
+-- node "id" key=value ... (quoted or unquoted)
 syntax "node" str dotKV* : dotElem
+syntax "node" ident dotKV* : dotElem
 
 -- edge with various port combinations
 syntax "edge" dotNodeRef "→" dotNodeRef dotKV* : dotElem
@@ -77,11 +82,17 @@ syntax "fanout" dotNodeRef "->" "[" str,* "]" dotKV* : dotElem
 syntax "node_defaults" dotKV+ : dotElem
 syntax "edge_defaults" dotKV+ : dotElem
 
+-- Same rank constraint: sameRank ["A", "B", "C"]
+syntax "sameRank" "[" str,* "]" : dotElem
+
 -- Subgraph/cluster block syntax
 declare_syntax_cat subgraphElem
 syntax "node" str dotKV* : subgraphElem
+syntax "node" ident dotKV* : subgraphElem  -- unquoted node id
 syntax "edge" dotNodeRef "→" dotNodeRef dotKV* : subgraphElem
 syntax "edge" dotNodeRef "->" dotNodeRef dotKV* : subgraphElem
+syntax "node_defaults" dotKV+ : subgraphElem  -- node defaults in cluster
+syntax "edge_defaults" dotKV+ : subgraphElem  -- edge defaults in cluster
 syntax ident str : subgraphElem  -- subgraph attr like label "foo"
 
 -- Cluster and subgraph
@@ -155,6 +166,22 @@ def parseNodeRef (ref : Lean.TSyntax `dotNodeRef) : Lean.MacroM (Lean.TSyntax `t
       let port ← `(Port.mk' $(Lean.quote (toString name.getId)) $dir)
       pure (id, port)
     | _, _ => pure (id, ← `(Port.mk none none))
+  -- Unquoted identifier cases
+  | `(dotNodeRef| $id:ident) =>
+    let idStr := Lean.quote (toString id.getId)
+    pure (← `($idStr), ← `(Port.mk none none))
+  | `(dotNodeRef| $id:ident $p:dotPort) =>
+    let idStr := Lean.quote (toString id.getId)
+    let port ← parsePort p
+    pure (← `($idStr), port)
+  | `(dotNodeRef| $id:ident $p1:dotPort $p2:dotPort) =>
+    let idStr := Lean.quote (toString id.getId)
+    match p1, p2 with
+    | `(dotPort| : $name:ident), `(dotPort| : $compassId:ident) =>
+      let dir ← parseCompass compassId
+      let port ← `(Port.mk' $(Lean.quote (toString name.getId)) $dir)
+      pure (← `($idStr), port)
+    | _, _ => pure (← `($idStr), ← `(Port.mk none none))
   | _ => Lean.Macro.throwUnsupported
 
 /-- Parse subgraph elements -/
@@ -166,6 +193,10 @@ def parseSubgraphElems (elems : Lean.TSyntaxArray `subgraphElem) (sgExpr : Lean.
       | `(subgraphElem| node $id:str $kvs:dotKV*) => do
         let attrList ← parseKVs kvs
         `(Subgraph.addNode $result { id := $id, attrs := $attrList })
+      | `(subgraphElem| node $id:ident $kvs:dotKV*) => do
+        let idStr := Lean.quote (toString id.getId)
+        let attrList ← parseKVs kvs
+        `(Subgraph.addNode $result { id := $idStr, attrs := $attrList })
       | `(subgraphElem| edge $src:dotNodeRef → $dst:dotNodeRef $kvs:dotKV*) => do
         let (srcId, srcPort) ← parseNodeRef src
         let (dstId, dstPort) ← parseNodeRef dst
@@ -176,6 +207,12 @@ def parseSubgraphElems (elems : Lean.TSyntaxArray `subgraphElem) (sgExpr : Lean.
         let (dstId, dstPort) ← parseNodeRef dst
         let attrList ← parseKVs kvs
         `(Subgraph.addEdge $result { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $attrList })
+      | `(subgraphElem| node_defaults $kvs:dotKV*) => do
+        let attrList ← parseKVs kvs
+        `(Subgraph.withNodeDefaults $result $attrList)
+      | `(subgraphElem| edge_defaults $kvs:dotKV*) => do
+        let attrList ← parseKVs kvs
+        `(Subgraph.withEdgeDefaults $result $attrList)
       | `(subgraphElem| $key:ident $val:str) =>
         `(Subgraph.withAttr $result (Attr.mk $(Lean.quote (toString key.getId)) $val))
       | _ => Lean.Macro.throwUnsupported
@@ -218,6 +255,10 @@ macro_rules
         | `(dotElem| node $id:str $kvs:dotKV*) => do
           let attrList ← parseKVs kvs
           `(Graph.addNode $graphExpr { id := $id, attrs := $attrList })
+        | `(dotElem| node $id:ident $kvs:dotKV*) => do
+          let idStr := Lean.quote (toString id.getId)
+          let attrList ← parseKVs kvs
+          `(Graph.addNode $graphExpr { id := $idStr, attrs := $attrList })
         | `(dotElem| edge $src:dotNodeRef → $dst:dotNodeRef $kvs:dotKV*) => do
           let (srcId, srcPort) ← parseNodeRef src
           let (dstId, dstPort) ← parseNodeRef dst
@@ -270,6 +311,14 @@ macro_rules
           for target in targets.getElems do
             result ← `(Graph.addEdge $result { src := $srcId, dst := $target, srcPort := $srcPort, dstPort := Port.mk none none, attrs := $attrList })
           pure result
+        -- Same rank constraint: sameRank ["A", "B", "C"]
+        | `(dotElem| sameRank [ $nodes:str,* ]) => do
+          let nodeArr := nodes.getElems
+          -- Create an anonymous subgraph with rank=same containing all the nodes
+          let mut sgExpr ← `(Subgraph.sameRank)
+          for nodeId in nodeArr do
+            sgExpr ← `(Subgraph.addNode $sgExpr (Node.new $nodeId))
+          `(Graph.addSubgraph $graphExpr $sgExpr)
         | `(dotElem| $key:ident $val:str) =>
           `(Graph.withAttr $graphExpr (Attr.mk $(Lean.quote (toString key.getId)) $val))
         | _ => Lean.Macro.throwUnsupported

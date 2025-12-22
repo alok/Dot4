@@ -56,12 +56,44 @@ inductive Direction where
   | undirected -- graph
   deriving Repr, BEq
 
+/-- Rank type for subgraph ranking -/
+inductive RankType where
+  | same
+  | min
+  | source
+  | max
+  | sink
+  deriving Repr, BEq
+
+namespace RankType
+def toString : RankType → String
+  | same => "same"
+  | min => "min"
+  | source => "source"
+  | max => "max"
+  | sink => "sink"
+
+def fromString? (s : String) : Option RankType :=
+  match s with
+  | "same" => some same
+  | "min" => some min
+  | "source" => some source
+  | "max" => some max
+  | "sink" => some sink
+  | _ => Option.none
+
+def allNames : List String := ["same", "min", "source", "max", "sink"]
+end RankType
+
 /-- A subgraph (cluster when name starts with "cluster") -/
 structure Subgraph where
   name : String
   nodes : List Node := []
   edges : List Edge := []
   attrs : List Attr := []
+  nodeDefaults : List Attr := []  -- node defaults within this subgraph
+  edgeDefaults : List Attr := []  -- edge defaults within this subgraph
+  rank : Option RankType := none  -- rank constraint
   deriving Repr
 
 /-- A complete graph -/
@@ -142,6 +174,23 @@ def target (t : String) : Attr := ⟨"target", t⟩
 -- Record nodes
 def rects (r : String) : Attr := ⟨"rects", r⟩
 
+-- Colorscheme support (e.g., "blues9", "set312", "accent8")
+def colorscheme (s : String) : Attr := ⟨"colorscheme", s⟩
+
+-- Image support
+def image (path : String) : Attr := ⟨"image", path⟩
+def imagescale (s : String) : Attr := ⟨"imagescale", s⟩
+
+-- Ordering
+def ordering (o : String) : Attr := ⟨"ordering", o⟩
+
+-- Size and ratio
+def size (s : String) : Attr := ⟨"size", s⟩
+def ratio (r : String) : Attr := ⟨"ratio", r⟩
+
+-- Output format hints
+def dpi (n : Nat) : Attr := ⟨"dpi", toString n⟩
+
 end Attr
 
 namespace Node
@@ -198,6 +247,15 @@ def cluster (name : String) : Subgraph := { name := "cluster_" ++ name }
 
 def plain (name : String) : Subgraph := { name }
 
+/-- Create a same-rank subgraph for horizontal alignment -/
+def sameRank (name : String := "") : Subgraph :=
+  { name := if name.isEmpty then "" else name, rank := some .same }
+
+/-- Create a same-rank subgraph from a list of node IDs -/
+def sameRankNodes (nodes : List String) (name : String := "") : Subgraph :=
+  let sg := sameRank name
+  nodes.foldl (fun acc id => { acc with nodes := acc.nodes ++ [{ id }] }) sg
+
 def addNode (sg : Subgraph) (n : Node) : Subgraph :=
   { sg with nodes := sg.nodes ++ [n] }
 
@@ -206,6 +264,15 @@ def addEdge (sg : Subgraph) (e : Edge) : Subgraph :=
 
 def withAttr (sg : Subgraph) (a : Attr) : Subgraph :=
   { sg with attrs := sg.attrs ++ [a] }
+
+def withNodeDefaults (sg : Subgraph) (as : List Attr) : Subgraph :=
+  { sg with nodeDefaults := sg.nodeDefaults ++ as }
+
+def withEdgeDefaults (sg : Subgraph) (as : List Attr) : Subgraph :=
+  { sg with edgeDefaults := sg.edgeDefaults ++ as }
+
+def withRank (sg : Subgraph) (r : RankType) : Subgraph :=
+  { sg with rank := some r }
 
 end Subgraph
 
