@@ -236,6 +236,11 @@ def ranksep (r : Float) : Attr := ⟨"ranksep", toString r⟩
 def concentrate (b : Bool) : Attr := ⟨"concentrate", if b then "true" else "false"⟩
 def compound (b : Bool) : Attr := ⟨"compound", if b then "true" else "false"⟩
 
+/-- Logical head cluster for compound edges (requires compound=true) -/
+def lhead (cluster : String) : Attr := ⟨"lhead", cluster⟩
+/-- Logical tail cluster for compound edges (requires compound=true) -/
+def ltail (cluster : String) : Attr := ⟨"ltail", cluster⟩
+
 -- URLs and interaction
 def href (u : String) : Attr := ⟨"href", u⟩
 def url (u : String) : Attr := ⟨"URL", u⟩

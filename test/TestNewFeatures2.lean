@@ -126,5 +126,27 @@ def testCombined := dot {
 
 #eval IO.println testCombined.toDot
 
+-- Test compound edges with lhead/ltail DSL syntax
+def testCompoundEdges : Graph := dot {
+  digraph "CompoundTest"
+  compound "true"
+
+  cluster "backend" {
+    label "Backend Services"
+    node "api" label="API"
+    node "db" label="Database"
+  }
+
+  cluster "frontend" {
+    label "Frontend"
+    node "web" label="Web App"
+  }
+
+  -- Edge from web to api, visually connecting to cluster boundaries
+  edge "web" → "api" lhead="cluster_backend" ltail="cluster_frontend"
+}
+
+#eval IO.println testCompoundEdges.toDot
+
 -- All tests pass if this file compiles
 #check "All new features compile successfully!"

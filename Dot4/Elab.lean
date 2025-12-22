@@ -107,6 +107,13 @@ def validateAttr (key : String) (value : String) : Except String Attr :=
     else
       .error s!"Invalid style in '{value}'. Valid node styles: solid, dashed, dotted, bold, rounded, filled, striped, wedged, invis. Valid edge styles: solid, dashed, dotted, bold, invis, tapered"
 
+  -- Compound edge cluster references
+  | "lhead" | "ltail" =>
+    if value.startsWith "cluster_" || value.startsWith "cluster" then
+      .ok (Attr.mk key value)
+    else
+      .error s!"Invalid {key} '{value}'. Cluster names typically start with 'cluster_' (e.g., 'cluster_backend')"
+
   -- Unknown attributes pass through (Graphviz-compatible)
   | _ => .ok (Attr.mk key value)
 

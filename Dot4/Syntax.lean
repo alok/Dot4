@@ -133,6 +133,38 @@ def parseKVs (kvs : Lean.TSyntaxArray `dotKV) : Lean.MacroM (Lean.TSyntax `term)
     | _ => Lean.Macro.throwUnsupported
   `([ $[$attrs],* ])
 
+/-- Result of parsing edge attributes, separating lhead/ltail from regular attrs -/
+structure EdgeAttrResult where
+  /-- Regular edge attributes -/
+  attrs : Lean.TSyntax `term
+  /-- Logical head cluster (lhead) for compound edges -/
+  lhead : Option (Lean.TSyntax `term)
+  /-- Logical tail cluster (ltail) for compound edges -/
+  ltail : Option (Lean.TSyntax `term)
+
+/-- Parse edge key-value pairs, extracting lhead/ltail separately -/
+def parseEdgeKVs (kvs : Lean.TSyntaxArray `dotKV) : Lean.MacroM EdgeAttrResult := do
+  let mut regularAttrs : Array (Lean.TSyntax `term) := #[]
+  let mut lheadVal : Option (Lean.TSyntax `term) := none
+  let mut ltailVal : Option (Lean.TSyntax `term) := none
+
+  for kv in kvs do
+    match kv with
+    | `(dotKV| $key:ident = $val:str) =>
+      let keyStr := toString key.getId
+      let valStr := val.getString
+      Dot4.validateAttrM keyStr valStr
+      if keyStr == "lhead" then
+        lheadVal := some (← `(some $val))
+      else if keyStr == "ltail" then
+        ltailVal := some (← `(some $val))
+      else
+        regularAttrs := regularAttrs.push (← `(Dot4.Attr.mk $(Lean.quote keyStr) $val))
+    | _ => Lean.Macro.throwUnsupported
+
+  let attrList ← `([ $[$regularAttrs],* ])
+  pure { attrs := attrList, lhead := lheadVal, ltail := ltailVal }
+
 /-- Parse a compass direction from identifier -/
 def parseCompass (id : Lean.Ident) : Lean.MacroM (Lean.TSyntax `term) := do
   let name := toString id.getId
@@ -227,13 +259,17 @@ def parseSubgraphElems (elems : Lean.TSyntaxArray `subgraphElem) (sgExpr : Lean.
       | `(subgraphElem| edge $src:dotNodeRef → $dst:dotNodeRef $kvs:dotKV*) => do
         let (srcId, srcPort) ← parseNodeRef src
         let (dstId, dstPort) ← parseNodeRef dst
-        let attrList ← parseKVs kvs
-        `(Subgraph.addEdge $result { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $attrList })
+        let edgeAttrs ← parseEdgeKVs kvs
+        let lheadExpr := edgeAttrs.lhead.getD (← `(none))
+        let ltailExpr := edgeAttrs.ltail.getD (← `(none))
+        `(Subgraph.addEdge $result { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $(edgeAttrs.attrs), lhead := $lheadExpr, ltail := $ltailExpr })
       | `(subgraphElem| edge $src:dotNodeRef -> $dst:dotNodeRef $kvs:dotKV*) => do
         let (srcId, srcPort) ← parseNodeRef src
         let (dstId, dstPort) ← parseNodeRef dst
-        let attrList ← parseKVs kvs
-        `(Subgraph.addEdge $result { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $attrList })
+        let edgeAttrs ← parseEdgeKVs kvs
+        let lheadExpr := edgeAttrs.lhead.getD (← `(none))
+        let ltailExpr := edgeAttrs.ltail.getD (← `(none))
+        `(Subgraph.addEdge $result { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $(edgeAttrs.attrs), lhead := $lheadExpr, ltail := $ltailExpr })
       | `(subgraphElem| node_defaults $kvs:dotKV*) => do
         let attrList ← parseKVs kvs
         `(Subgraph.withNodeDefaults $result $attrList)
@@ -289,13 +325,17 @@ macro_rules
         | `(dotElem| edge $src:dotNodeRef → $dst:dotNodeRef $kvs:dotKV*) => do
           let (srcId, srcPort) ← parseNodeRef src
           let (dstId, dstPort) ← parseNodeRef dst
-          let attrList ← parseKVs kvs
-          `(Graph.addEdge $graphExpr { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $attrList })
+          let edgeAttrs ← parseEdgeKVs kvs
+          let lheadExpr := edgeAttrs.lhead.getD (← `(none))
+          let ltailExpr := edgeAttrs.ltail.getD (← `(none))
+          `(Graph.addEdge $graphExpr { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $(edgeAttrs.attrs), lhead := $lheadExpr, ltail := $ltailExpr })
         | `(dotElem| edge $src:dotNodeRef -> $dst:dotNodeRef $kvs:dotKV*) => do
           let (srcId, srcPort) ← parseNodeRef src
           let (dstId, dstPort) ← parseNodeRef dst
-          let attrList ← parseKVs kvs
-          `(Graph.addEdge $graphExpr { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $attrList })
+          let edgeAttrs ← parseEdgeKVs kvs
+          let lheadExpr := edgeAttrs.lhead.getD (← `(none))
+          let ltailExpr := edgeAttrs.ltail.getD (← `(none))
+          `(Graph.addEdge $graphExpr { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $(edgeAttrs.attrs), lhead := $lheadExpr, ltail := $ltailExpr })
         -- Bidirectional edges (creates two edges in opposite directions)
         | `(dotElem| edge $src:dotNodeRef ↔ $dst:dotNodeRef $kvs:dotKV*) => do
           let (srcId, srcPort) ← parseNodeRef src
