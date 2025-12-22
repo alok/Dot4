@@ -1,0 +1,11 @@
+digraph "ChainTest" {
+    rankdir="LR";
+
+    "A" [label="Start"];
+    "B" [label="Step 1"];
+    "C" [label="Step 2"];
+    "D" [label="End"];
+    "A" -> "B";
+    "B" -> "C";
+    "C" -> "D";
+}

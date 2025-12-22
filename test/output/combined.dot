@@ -1,0 +1,21 @@
+digraph "CombinedTest" {
+    rankdir="TB";
+    node [style="filled", fillcolor="#E3F2FD"];
+
+    subgraph "cluster_input" {
+        label="Inputs";
+        bgcolor="#FFECB3";
+        "i1" [label="Input 1"];
+        "i2" [label="Input 2"];
+    }
+
+    "process" [label="Process", shape="box"];
+    "out1" [label="Out 1"];
+    "out2" [label="Out 2"];
+    "out3" [label="Out 3"];
+    "i1" -> "process";
+    "i2" -> "process";
+    "process" -> "out1";
+    "process" -> "out2";
+    "process" -> "out3";
+}

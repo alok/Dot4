@@ -1,0 +1,17 @@
+digraph "ClusterEdges" {
+    compound="true";
+
+    subgraph "cluster_source" {
+        label="Source";
+        "s1" [label="S1"];
+        "s2" [label="S2"];
+    }
+    subgraph "cluster_target" {
+        label="Target";
+        "t1" [label="T1"];
+        "t2" [label="T2"];
+    }
+
+    "s1" -> "t1" [lhead="cluster_target", ltail="cluster_source"];
+    "s2" -> "t2";
+}

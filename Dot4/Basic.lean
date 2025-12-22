@@ -44,6 +44,10 @@ structure Edge where
   dstPort : Port := {}
   label : Option String := none
   attrs : List Attr := []
+  /-- Cluster to route edge head to (requires compound=true on graph) -/
+  lhead : Option String := none
+  /-- Cluster to route edge tail from (requires compound=true on graph) -/
+  ltail : Option String := none
   deriving Repr
 
 /-- Graph direction -/
@@ -64,6 +68,8 @@ structure Subgraph where
 structure Graph where
   name : String := "G"
   direction : Direction := .directed
+  /-- Strict mode: no multi-edges between same node pair -/
+  strict : Bool := false
   nodes : List Node := []
   edges : List Edge := []
   subgraphs : List Subgraph := []
@@ -172,6 +178,18 @@ def withDstPort (e : Edge) (p : Port) : Edge := { e with dstPort := p }
 
 def withPorts (e : Edge) (src dst : Port) : Edge := { e with srcPort := src, dstPort := dst }
 
+/-- Route edge head to a cluster boundary (requires compound=true on graph) -/
+def toCluster (e : Edge) (clusterName : String) : Edge :=
+  { e with lhead := some ("cluster_" ++ clusterName) }
+
+/-- Route edge tail from a cluster boundary (requires compound=true on graph) -/
+def fromCluster (e : Edge) (clusterName : String) : Edge :=
+  { e with ltail := some ("cluster_" ++ clusterName) }
+
+/-- Set both lhead and ltail for cluster-to-cluster edges -/
+def betweenClusters (e : Edge) (from_ to : String) : Edge :=
+  { e with ltail := some ("cluster_" ++ from_), lhead := some ("cluster_" ++ to) }
+
 end Edge
 
 namespace Subgraph
@@ -218,6 +236,10 @@ def withNodeDefaults (g : Graph) (as : List Attr) : Graph :=
 
 def withEdgeDefaults (g : Graph) (as : List Attr) : Graph :=
   { g with edgeDefaults := g.edgeDefaults ++ as }
+
+/-- Enable strict mode (no multi-edges between same node pair) -/
+def withStrict (g : Graph) (s : Bool := true) : Graph :=
+  { g with strict := s }
 
 end Graph
 

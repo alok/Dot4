@@ -1,0 +1,11 @@
+digraph "ValidationTest" {
+    rankdir="LR";
+    node [style="filled,rounded"];
+
+    "n1" [shape="box"];
+    "n2" [shape="circle"];
+    "n3" [shape="diamond"];
+    "c1" [fillcolor="#FF5733"];
+    "c2" [fillcolor="red"];
+    "c3" [fillcolor="lightblue"];
+}

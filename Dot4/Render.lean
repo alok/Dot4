@@ -50,7 +50,14 @@ def renderEdge (e : Edge) (directed : Bool) (indent : String := "    ") : String
   let labelAttr := match e.label with
     | some l => [Attr.mk "label" l]
     | none => []
-  let allAttrs := labelAttr ++ e.attrs
+  -- Add lhead/ltail for cluster edge routing
+  let lheadAttr := match e.lhead with
+    | some h => [Attr.mk "lhead" h]
+    | none => []
+  let ltailAttr := match e.ltail with
+    | some t => [Attr.mk "ltail" t]
+    | none => []
+  let allAttrs := labelAttr ++ lheadAttr ++ ltailAttr ++ e.attrs
   let srcStr := quoted e.src ++ renderPort e.srcPort
   let dstStr := quoted e.dst ++ renderPort e.dstPort
   indent ++ srcStr ++ arrow ++ dstStr ++ renderAttrs allAttrs ++ ";"
@@ -71,11 +78,12 @@ def renderSubgraph (sg : Subgraph) (directed : Bool) : Array String :=
 
 /-- Render graph to DOT format -/
 def Graph.toDot (g : Graph) : String :=
+  let strictPrefix := if g.strict then "strict " else ""
   let keyword := match g.direction with
     | .directed => "digraph"
     | .undirected => "graph"
 
-  let lines := #[keyword ++ " " ++ quoted g.name ++ " {"]
+  let lines := #[strictPrefix ++ keyword ++ " " ++ quoted g.name ++ " {"]
 
   -- Graph attributes
   let lines := g.attrs.foldl (fun acc a =>

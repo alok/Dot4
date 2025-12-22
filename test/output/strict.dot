@@ -1,0 +1,9 @@
+strict digraph "StrictTest" {
+    rankdir="LR";
+
+    "A" [label="Node A"];
+    "B" [label="Node B"];
+    "A" -> "B" [label="first"];
+    "A" -> "B" [label="second"];
+    "A" -> "B" [label="third"];
+}

@@ -30,6 +30,62 @@ private def toHex (n : UInt8) : String :=
   let lo := n.toNat % 16
   String.ofList [hexChar hi, hexChar lo]
 
+/-- Parse hex character to number -/
+private def fromHexChar? (c : Char) : Option Nat :=
+  if c >= '0' && c <= '9' then some (c.toNat - '0'.toNat)
+  else if c >= 'a' && c <= 'f' then some (c.toNat - 'a'.toNat + 10)
+  else if c >= 'A' && c <= 'F' then some (c.toNat - 'A'.toNat + 10)
+  else none
+
+/-- Parse two hex characters to a byte -/
+private def fromHexPair? (hi lo : Char) : Option UInt8 := do
+  let h ← fromHexChar? hi
+  let l ← fromHexChar? lo
+  return (h * 16 + l).toUInt8
+
+/-- Check if a character is valid hex -/
+private def isHexChar (c : Char) : Bool :=
+  (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+
+/-- List of valid X11 color names (subset of most common) -/
+def validColorNames : List String := [
+  "black", "white", "red", "green", "blue", "yellow", "cyan", "magenta",
+  "orange", "purple", "pink", "brown", "gray", "grey", "lightblue",
+  "lightgreen", "lightgray", "lightgrey", "lightyellow", "lightpink",
+  "lightcyan", "darkblue", "darkgreen", "darkgray", "darkgrey", "darkred",
+  "darkorange", "darkcyan", "coral", "crimson", "gold", "indigo", "ivory",
+  "khaki", "lavender", "lime", "maroon", "navy", "olive", "orchid", "plum",
+  "salmon", "sienna", "silver", "tan", "teal", "tomato", "turquoise",
+  "violet", "wheat", "transparent", "none",
+  -- Grays
+  "gray10", "gray20", "gray30", "gray40", "gray50",
+  "gray60", "gray70", "gray80", "gray90"
+]
+
+/-- Parse a string to a Color -/
+def parse? (s : String) : Option Color :=
+  -- Handle hex colors
+  if s.startsWith "#" then
+    let hexPart := s.drop 1
+    if hexPart.length == 6 && hexPart.all isHexChar then
+      some (hex s)
+    else if hexPart.length == 8 && hexPart.all isHexChar then
+      some (hex s)  -- RGBA hex
+    else
+      none
+  -- Handle rgb() syntax
+  else if s.startsWith "rgb(" && s.endsWith ")" then
+    some (named s)  -- Pass through, Graphviz handles it
+  -- Handle named colors (relaxed - accept any alphanumeric)
+  else if s.all (fun c => c.isAlpha || c.isDigit) then
+    some (named s)
+  else
+    none
+
+/-- Validate that a color string is valid (for error messages) -/
+def isValid (s : String) : Bool :=
+  (parse? s).isSome
+
 /-- Convert color to DOT format string -/
 def toString : Color → String
   | named n => n

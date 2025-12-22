@@ -1,0 +1,9 @@
+digraph "FanoutTest" {
+    "hub" [label="Hub", shape="circle"];
+    "a" [label="Node A"];
+    "b" [label="Node B"];
+    "c" [label="Node C"];
+    "hub" -> "a";
+    "hub" -> "b";
+    "hub" -> "c";
+}

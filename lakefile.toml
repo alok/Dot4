@@ -12,3 +12,7 @@ root = "Main"
 [[lean_exe]]
 name = "dot4-test"
 root = "test.Tests"
+
+[[lean_exe]]
+name = "test-new-features"
+root = "test.TestNewFeatures"

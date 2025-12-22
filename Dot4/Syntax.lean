@@ -1,4 +1,5 @@
 import Dot4.Render
+import Dot4.Elab
 
 /-!
 # DOT DSL Syntax
@@ -60,6 +61,18 @@ syntax "node" str dotKV* : dotElem
 syntax "edge" dotNodeRef "→" dotNodeRef dotKV* : dotElem
 syntax "edge" dotNodeRef "->" dotNodeRef dotKV* : dotElem
 
+-- Bidirectional edges (creates two edges)
+syntax "edge" dotNodeRef "↔" dotNodeRef dotKV* : dotElem
+syntax "edge" dotNodeRef "<->" dotNodeRef dotKV* : dotElem
+
+-- Edge chains: chain "A" → "B" → "C" → "D"
+-- Simplified to chain with explicit node list
+syntax "chain" "[" str,+ "]" dotKV* : dotElem
+
+-- Multi-target edges: fanout "hub" → ["a", "b", "c"]
+syntax "fanout" dotNodeRef "→" "[" str,* "]" dotKV* : dotElem
+syntax "fanout" dotNodeRef "->" "[" str,* "]" dotKV* : dotElem
+
 -- Node/edge defaults
 syntax "node_defaults" dotKV+ : dotElem
 syntax "edge_defaults" dotKV+ : dotElem
@@ -78,17 +91,23 @@ syntax "subgraph" str "{" subgraphElem* "}" : dotElem
 -- Graph-level attributes
 syntax "digraph" str : dotElem
 syntax "graph" str : dotElem
+syntax "strict" "digraph" str : dotElem  -- strict digraph (no multi-edges)
+syntax "strict" "graph" str : dotElem    -- strict graph (no multi-edges)
 syntax ident str : dotElem  -- generic attr like rankdir "TB"
 
 -- Main graph block
 syntax "dot" "{" dotElem* "}" : term
 
-/-- Convert key-value pairs to attribute list -/
+/-- Convert key-value pairs to attribute list with validation -/
 def parseKVs (kvs : Lean.TSyntaxArray `dotKV) : Lean.MacroM (Lean.TSyntax `term) := do
   let attrs ← kvs.mapM fun kv => do
     match kv with
     | `(dotKV| $key:ident = $val:str) =>
-      `(Dot4.Attr.mk $(Lean.quote (toString key.getId)) $val)
+      let keyStr := toString key.getId
+      let valStr := val.getString
+      -- Validate the attribute at macro expansion time
+      Dot4.validateAttrM keyStr valStr
+      `(Dot4.Attr.mk $(Lean.quote keyStr) $val)
     | _ => Lean.Macro.throwUnsupported
   `([ $[$attrs],* ])
 
@@ -172,6 +191,10 @@ macro_rules
           `({ $graphExpr with name := $name, direction := .directed })
         | `(dotElem| graph $name:str) =>
           `({ $graphExpr with name := $name, direction := .undirected })
+        | `(dotElem| strict digraph $name:str) =>
+          `({ $graphExpr with name := $name, direction := .directed, «strict» := true })
+        | `(dotElem| strict graph $name:str) =>
+          `({ $graphExpr with name := $name, direction := .undirected, «strict» := true })
         | `(dotElem| rankdir $dir:str) =>
           `(Graph.withAttr $graphExpr (Attr.rankdir $dir))
         | `(dotElem| bgcolor $c:str) =>
@@ -205,6 +228,48 @@ macro_rules
           let (dstId, dstPort) ← parseNodeRef dst
           let attrList ← parseKVs kvs
           `(Graph.addEdge $graphExpr { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $attrList })
+        -- Bidirectional edges (creates two edges in opposite directions)
+        | `(dotElem| edge $src:dotNodeRef ↔ $dst:dotNodeRef $kvs:dotKV*) => do
+          let (srcId, srcPort) ← parseNodeRef src
+          let (dstId, dstPort) ← parseNodeRef dst
+          let attrList ← parseKVs kvs
+          `(Graph.addEdge (Graph.addEdge $graphExpr
+              { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $attrList })
+              { src := $dstId, dst := $srcId, srcPort := $dstPort, dstPort := $srcPort, attrs := $attrList })
+        | `(dotElem| edge $src:dotNodeRef <-> $dst:dotNodeRef $kvs:dotKV*) => do
+          let (srcId, srcPort) ← parseNodeRef src
+          let (dstId, dstPort) ← parseNodeRef dst
+          let attrList ← parseKVs kvs
+          `(Graph.addEdge (Graph.addEdge $graphExpr
+              { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $attrList })
+              { src := $dstId, dst := $srcId, srcPort := $dstPort, dstPort := $srcPort, attrs := $attrList })
+        -- Edge chains: chain ["A", "B", "C", "D"] creates A→B→C→D
+        | `(dotElem| chain [ $nodes:str,* ] $kvs:dotKV*) => do
+          let attrList ← parseKVs kvs
+          let nodeArr := nodes.getElems
+          if nodeArr.size < 2 then
+            Lean.Macro.throwError "Edge chain requires at least 2 nodes"
+          let mut result := graphExpr
+          for i in [0:nodeArr.size - 1] do
+            let src := nodeArr[i]!
+            let dst := nodeArr[i + 1]!
+            result ← `(Graph.addEdge $result { src := $src, dst := $dst, srcPort := Port.mk none none, dstPort := Port.mk none none, attrs := $attrList })
+          pure result
+        -- Multi-target edges: fanout "hub" → ["a", "b", "c"]
+        | `(dotElem| fanout $src:dotNodeRef → [ $targets:str,* ] $kvs:dotKV*) => do
+          let (srcId, srcPort) ← parseNodeRef src
+          let attrList ← parseKVs kvs
+          let mut result := graphExpr
+          for target in targets.getElems do
+            result ← `(Graph.addEdge $result { src := $srcId, dst := $target, srcPort := $srcPort, dstPort := Port.mk none none, attrs := $attrList })
+          pure result
+        | `(dotElem| fanout $src:dotNodeRef -> [ $targets:str,* ] $kvs:dotKV*) => do
+          let (srcId, srcPort) ← parseNodeRef src
+          let attrList ← parseKVs kvs
+          let mut result := graphExpr
+          for target in targets.getElems do
+            result ← `(Graph.addEdge $result { src := $srcId, dst := $target, srcPort := $srcPort, dstPort := Port.mk none none, attrs := $attrList })
+          pure result
         | `(dotElem| $key:ident $val:str) =>
           `(Graph.withAttr $graphExpr (Attr.mk $(Lean.quote (toString key.getId)) $val))
         | _ => Lean.Macro.throwUnsupported

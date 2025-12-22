@@ -1,0 +1,6 @@
+digraph "BidirectionalTest" {
+    "client" [label="Client"];
+    "server" [label="Server"];
+    "client" -> "server" [label="request/response"];
+    "server" -> "client" [label="request/response"];
+}
