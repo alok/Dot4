@@ -1,30 +1,62 @@
 /-!
 # Dot4: Graphviz DOT DSL for Lean 4
 
-A type-safe DSL for generating Graphviz DOT diagrams.
+A type-safe DSL for generating [Graphviz](https://graphviz.org/) DOT diagrams.
+
+See the [DOT Language Reference](https://graphviz.org/doc/info/lang.html) for the
+underlying format specification.
+
+## Core Types
+
+- `Graph`: The main container for nodes, edges, and subgraphs
+- `Node`: A vertex with an ID, optional label, and attributes
+- `Edge`: A connection between two nodes
+- `Subgraph`: A nested graph (clusters when name starts with `cluster`)
+- `Attr`: A key-value pair for DOT attributes
+
+## References
+
+- [DOT Language](https://graphviz.org/doc/info/lang.html)
+- [Node, Edge and Graph Attributes](https://graphviz.org/doc/info/attrs.html)
+- [Node Shapes](https://graphviz.org/doc/info/shapes.html)
+- [Colors](https://graphviz.org/doc/info/colors.html)
 -/
 
 namespace Dot4
 
-/-- Node or graph attribute -/
+/-- A DOT attribute as a key-value pair (e.g., `shape=box`) -/
 structure Attr where
+  /-- Attribute name (e.g., `shape`, `color`, `label`) -/
   key : String
+  /-- Attribute value (e.g., `box`, `red`, `"My Label"`) -/
   value : String
   deriving Repr, BEq, Hashable
 
 /-- A node in the graph -/
 structure Node where
+  /-- Unique node identifier -/
   id : String
+  /-- Optional display label (uses `id` if not set) -/
   label : Option String := none
+  /-- Node attributes like `shape`, `color`, `style` -/
   attrs : List Attr := []
   deriving Repr
 
-/-- Compass point for edge ports -/
+/-- Compass point for edge ports. Maps to DOT compass points: `n`, `ne`, `e`, etc. -/
 inductive Compass where
-  | n | ne | e | se | s | sw | w | nw | c
+  /-- North -/ | n
+  /-- Northeast -/ | ne
+  /-- East -/ | e
+  /-- Southeast -/ | se
+  /-- South -/ | s
+  /-- Southwest -/ | sw
+  /-- West -/ | w
+  /-- Northwest -/ | nw
+  /-- Center -/ | c
   deriving Repr, BEq
 
 namespace Compass
+/-- Convert compass point to DOT string -/
 def toString : Compass → String
   | n => "n" | ne => "ne" | e => "e" | se => "se"
   | s => "s" | sw => "sw" | w => "w" | nw => "nw" | c => "c"
@@ -32,40 +64,56 @@ end Compass
 
 /-- Port specification for edge endpoints -/
 structure Port where
-  name : Option String := none     -- record port name
-  compass : Option Compass := none -- compass direction
+  /-- Record port name (for record-shaped nodes) -/
+  name : Option String := none
+  /-- Compass direction for edge attachment -/
+  compass : Option Compass := none
   deriving Repr, BEq
 
-/-- An edge between nodes -/
+/-- An edge between two nodes -/
 structure Edge where
+  /-- Source node ID -/
   src : String
+  /-- Destination node ID -/
   dst : String
+  /-- Port specification for source endpoint -/
   srcPort : Port := {}
+  /-- Port specification for destination endpoint -/
   dstPort : Port := {}
+  /-- Optional edge label -/
   label : Option String := none
+  /-- Edge attributes like `color`, `style`, `arrowhead` -/
   attrs : List Attr := []
-  /-- Cluster to route edge head to (requires compound=true on graph) -/
+  /-- Cluster to route edge head to (requires `compound=true` on graph) -/
   lhead : Option String := none
-  /-- Cluster to route edge tail from (requires compound=true on graph) -/
+  /-- Cluster to route edge tail from (requires `compound=true` on graph) -/
   ltail : Option String := none
   deriving Repr
 
-/-- Graph direction -/
+/-- Graph direction: directed (`digraph`) or undirected (`graph`) -/
 inductive Direction where
-  | directed   -- digraph
-  | undirected -- graph
+  /-- Directed graph with arrows (`->`) -/
+  | directed
+  /-- Undirected graph with plain edges (`--`) -/
+  | undirected
   deriving Repr, BEq
 
-/-- Rank type for subgraph ranking -/
+/-- Rank constraint type for subgraphs -/
 inductive RankType where
+  /-- All nodes in subgraph have same rank -/
   | same
+  /-- All nodes have minimum rank -/
   | min
+  /-- All nodes are sources (no incoming edges at this rank) -/
   | source
+  /-- All nodes have maximum rank -/
   | max
+  /-- All nodes are sinks (no outgoing edges at this rank) -/
   | sink
   deriving Repr, BEq
 
 namespace RankType
+/-- Convert rank type to DOT string -/
 def toString : RankType → String
   | same => "same"
   | min => "min"
@@ -73,6 +121,7 @@ def toString : RankType → String
   | max => "max"
   | sink => "sink"
 
+/-- Parse a string to a `RankType` -/
 def fromString? (s : String) : Option RankType :=
   match s with
   | "same" => some same
@@ -82,35 +131,56 @@ def fromString? (s : String) : Option RankType :=
   | "sink" => some sink
   | _ => Option.none
 
+/-- All valid rank type names -/
 def allNames : List String := ["same", "min", "source", "max", "sink"]
 end RankType
 
-/-- A subgraph (cluster when name starts with "cluster") -/
+/-- A subgraph or cluster. Clusters have names starting with `cluster`. -/
 structure Subgraph where
+  /-- Subgraph name. Use `cluster_` prefix for visual clustering. -/
   name : String
+  /-- Nodes contained in this subgraph -/
   nodes : List Node := []
+  /-- Edges contained in this subgraph -/
   edges : List Edge := []
+  /-- Subgraph attributes like `label`, `style`, `bgcolor` -/
   attrs : List Attr := []
-  nodeDefaults : List Attr := []  -- node defaults within this subgraph
-  edgeDefaults : List Attr := []  -- edge defaults within this subgraph
-  rank : Option RankType := none  -- rank constraint
+  /-- Default attributes for nodes in this subgraph -/
+  nodeDefaults : List Attr := []
+  /-- Default attributes for edges in this subgraph -/
+  edgeDefaults : List Attr := []
+  /-- Rank constraint for nodes in this subgraph -/
+  rank : Option RankType := none
   deriving Repr
 
-/-- A complete graph -/
+/-- A complete DOT graph -/
 structure Graph where
+  /-- Graph name (appears in output as `digraph "name"`) -/
   name : String := "G"
+  /-- Whether edges are directed (`->`) or undirected (`--`) -/
   direction : Direction := .directed
   /-- Strict mode: no multi-edges between same node pair -/
   strict : Bool := false
+  /-- Top-level nodes -/
   nodes : List Node := []
+  /-- Top-level edges -/
   edges : List Edge := []
+  /-- Subgraphs and clusters -/
   subgraphs : List Subgraph := []
+  /-- Graph-level attributes -/
   attrs : List Attr := []
+  /-- Default attributes applied to all nodes -/
   nodeDefaults : List Attr := []
+  /-- Default attributes applied to all edges -/
   edgeDefaults : List Attr := []
   deriving Repr
 
+/-! ### Attribute Constructors
+
+Convenience functions for creating common DOT attributes.
+These match DOT attribute names exactly. -/
 namespace Attr
+set_option linter.missingDocs false
 
 -- Common attributes
 def shape (s : String) : Attr := ⟨"shape", s⟩
@@ -193,38 +263,44 @@ def dpi (n : Nat) : Attr := ⟨"dpi", toString n⟩
 
 end Attr
 
+/-! ### Builder Functions
+
+Fluent builder patterns for constructing nodes, edges, and graphs.
+Method names follow standard conventions (`new`, `withX`). -/
+section Builders
+
 namespace Node
-
+/-- Create a new node with the given ID -/
 def new (id : String) : Node := { id }
-
+/-- Set the display label for a node -/
 def withLabel (n : Node) (l : String) : Node := { n with label := some l }
-
+/-- Append a list of attributes to a node -/
 def withAttrs (n : Node) (as : List Attr) : Node := { n with attrs := n.attrs ++ as }
-
+/-- Add a single attribute to a node -/
 def withAttr (n : Node) (a : Attr) : Node := n.withAttrs [a]
-
 end Node
 
 namespace Port
-
+/-- Create a port from a compass direction -/
 def fromCompass (dir : Compass) : Port := { compass := some dir }
+/-- Create a port from a record field name -/
 def fromName (n : String) : Port := { name := some n }
+/-- Create a port with both name and compass direction -/
 def mk' (n : String) (dir : Compass) : Port := { name := some n, compass := some dir }
-
 end Port
 
 namespace Edge
-
+/-- Create a new edge from source to destination node -/
 def new (src dst : String) : Edge := { src, dst }
-
+/-- Set the edge label -/
 def withLabel (e : Edge) (l : String) : Edge := { e with label := some l }
-
+/-- Append a list of attributes to an edge -/
 def withAttrs (e : Edge) (as : List Attr) : Edge := { e with attrs := e.attrs ++ as }
-
+/-- Set the source port for the edge -/
 def withSrcPort (e : Edge) (p : Port) : Edge := { e with srcPort := p }
-
+/-- Set the destination port for the edge -/
 def withDstPort (e : Edge) (p : Port) : Edge := { e with dstPort := p }
-
+/-- Set both source and destination ports for the edge -/
 def withPorts (e : Edge) (src dst : Port) : Edge := { e with srcPort := src, dstPort := dst }
 
 /-- Route edge head to a cluster boundary (requires compound=true on graph) -/
@@ -243,8 +319,10 @@ end Edge
 
 namespace Subgraph
 
+/-- Create a visual cluster subgraph (adds `cluster_` prefix) -/
 def cluster (name : String) : Subgraph := { name := "cluster_" ++ name }
 
+/-- Create a plain subgraph without visual clustering -/
 def plain (name : String) : Subgraph := { name }
 
 /-- Create a same-rank subgraph for horizontal alignment -/
@@ -256,21 +334,27 @@ def sameRankNodes (nodes : List String) (name : String := "") : Subgraph :=
   let sg := sameRank name
   nodes.foldl (fun acc id => { acc with nodes := acc.nodes ++ [{ id }] }) sg
 
+/-- Add a node to the subgraph -/
 def addNode (sg : Subgraph) (n : Node) : Subgraph :=
   { sg with nodes := sg.nodes ++ [n] }
 
+/-- Add an edge to the subgraph -/
 def addEdge (sg : Subgraph) (e : Edge) : Subgraph :=
   { sg with edges := sg.edges ++ [e] }
 
+/-- Add an attribute to the subgraph -/
 def withAttr (sg : Subgraph) (a : Attr) : Subgraph :=
   { sg with attrs := sg.attrs ++ [a] }
 
+/-- Set default attributes for all nodes in the subgraph -/
 def withNodeDefaults (sg : Subgraph) (as : List Attr) : Subgraph :=
   { sg with nodeDefaults := sg.nodeDefaults ++ as }
 
+/-- Set default attributes for all edges in the subgraph -/
 def withEdgeDefaults (sg : Subgraph) (as : List Attr) : Subgraph :=
   { sg with edgeDefaults := sg.edgeDefaults ++ as }
 
+/-- Set the rank constraint for nodes in the subgraph -/
 def withRank (sg : Subgraph) (r : RankType) : Subgraph :=
   { sg with rank := some r }
 
@@ -278,29 +362,38 @@ end Subgraph
 
 namespace Graph
 
+/-- Create an empty directed graph -/
 def empty : Graph := {}
 
+/-- Create a directed graph with arrows -/
 def digraph (name : String := "G") : Graph :=
   { name, direction := .directed }
 
+/-- Create an undirected graph -/
 def graph (name : String := "G") : Graph :=
   { name, direction := .undirected }
 
+/-- Add a node to the graph -/
 def addNode (g : Graph) (n : Node) : Graph :=
   { g with nodes := g.nodes ++ [n] }
 
+/-- Add an edge to the graph -/
 def addEdge (g : Graph) (e : Edge) : Graph :=
   { g with edges := g.edges ++ [e] }
 
+/-- Add a subgraph to the graph -/
 def addSubgraph (g : Graph) (sg : Subgraph) : Graph :=
   { g with subgraphs := g.subgraphs ++ [sg] }
 
+/-- Add an attribute to the graph -/
 def withAttr (g : Graph) (a : Attr) : Graph :=
   { g with attrs := g.attrs ++ [a] }
 
+/-- Set default attributes for all nodes in the graph -/
 def withNodeDefaults (g : Graph) (as : List Attr) : Graph :=
   { g with nodeDefaults := g.nodeDefaults ++ as }
 
+/-- Set default attributes for all edges in the graph -/
 def withEdgeDefaults (g : Graph) (as : List Attr) : Graph :=
   { g with edgeDefaults := g.edgeDefaults ++ as }
 
@@ -309,5 +402,7 @@ def withStrict (g : Graph) (s : Bool := true) : Graph :=
   { g with strict := s }
 
 end Graph
+
+end Builders
 
 end Dot4
