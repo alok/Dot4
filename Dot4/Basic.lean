@@ -219,6 +219,17 @@ def penwidth (w : Float) : Attr := ⟨"penwidth", toString w⟩
 def peripheries (n : Nat) : Attr := ⟨"peripheries", toString n⟩
 def gradientangle (a : Nat) : Attr := ⟨"gradientangle", toString a⟩
 
+/-- Number of sides for polygon shape (3-100) -/
+def sides (n : Nat) : Attr := ⟨"sides", toString n⟩
+/-- Distortion factor for polygon shape (-100.0 to 100.0) -/
+def distortion (d : Float) : Attr := ⟨"distortion", toString d⟩
+/-- Skew factor for polygon shape (-100.0 to 100.0) -/
+def skew (s : Float) : Attr := ⟨"skew", toString s⟩
+/-- Whether polygon vertices are evenly spaced (regular=true) -/
+def regular (b : Bool) : Attr := ⟨"regular", if b then "true" else "false"⟩
+/-- Rotation angle for node in degrees -/
+def orientation (angle : Float) : Attr := ⟨"orientation", toString angle⟩
+
 -- Text/label
 def xlabel (l : String) : Attr := ⟨"xlabel", l⟩
 def headlabel (l : String) : Attr := ⟨"headlabel", l⟩

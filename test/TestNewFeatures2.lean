@@ -1,10 +1,12 @@
 import Dot4
 
 /-!
-# Test New Features: sameRank, cluster node_defaults, colorscheme, unquoted identifiers
+Test DSL features: sameRank, cluster defaults, colorscheme, unquoted identifiers
 -/
 
 open Dot4
+
+set_option linter.missingDocs false
 
 -- Test 1: sameRank syntax
 def testSameRank := dot {
@@ -147,6 +149,47 @@ def testCompoundEdges : Graph := dot {
 }
 
 #eval IO.println testCompoundEdges.toDot
+
+-- Test polygon shape parameters
+def testPolygonShapes : Graph :=
+  Graph.digraph "PolygonShapes"
+  |>.withAttr (Attr.rankdirT RankDir.LR)
+  -- Pentagon (5 sides)
+  |>.addNode {
+    id := "pentagon"
+    label := some "Pentagon"
+    attrs := [Attr.shapeT Shape.polygon, Attr.sides 5, Attr.regular true]
+  }
+  -- Octagon (8 sides)
+  |>.addNode {
+    id := "octagon"
+    label := some "Octagon"
+    attrs := [Attr.shapeT Shape.polygon, Attr.sides 8]
+  }
+  -- Distorted hexagon
+  |>.addNode {
+    id := "distorted"
+    label := some "Distorted"
+    attrs := [Attr.shapeT Shape.polygon, Attr.sides 6, Attr.distortion 0.5]
+  }
+  -- Skewed square
+  |>.addNode {
+    id := "skewed"
+    label := some "Skewed"
+    attrs := [Attr.shapeT Shape.polygon, Attr.sides 4, Attr.skew 0.3]
+  }
+  -- Rotated triangle
+  |>.addNode {
+    id := "rotated"
+    label := some "Rotated"
+    attrs := [Attr.shapeT Shape.polygon, Attr.sides 3, Attr.orientation 30.0]
+  }
+  |>.addEdge { src := "pentagon", dst := "octagon" }
+  |>.addEdge { src := "octagon", dst := "distorted" }
+  |>.addEdge { src := "distorted", dst := "skewed" }
+  |>.addEdge { src := "skewed", dst := "rotated" }
+
+#eval IO.println testPolygonShapes.toDot
 
 -- All tests pass if this file compiles
 #check "All new features compile successfully!"
