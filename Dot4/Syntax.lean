@@ -1,5 +1,6 @@
 import Dot4.Render
 import Dot4.Elab
+import Dot4.Record
 
 /-!
 # DOT DSL Syntax
@@ -84,6 +85,15 @@ syntax "edge_defaults" dotKV+ : dotElem
 
 -- Same rank constraint: sameRank ["A", "B", "C"]
 syntax "sameRank" "[" str,* "]" : dotElem
+
+-- Record node syntax
+declare_syntax_cat recordField
+syntax str ":" str : recordField           -- "port" : "label"
+syntax str : recordField                    -- just "label" (no port)
+syntax "{" recordField,* "}" : recordField  -- nested row
+
+syntax "record" str "[" recordField,* "]" dotKV* : dotElem
+syntax "mrecord" str "[" recordField,* "]" dotKV* : dotElem  -- rounded corners
 
 -- Subgraph/cluster block syntax
 declare_syntax_cat subgraphElem
@@ -182,6 +192,22 @@ def parseNodeRef (ref : Lean.TSyntax `dotNodeRef) : Lean.MacroM (Lean.TSyntax `t
       let port ← `(Port.mk' $(Lean.quote (toString name.getId)) $dir)
       pure (← `($idStr), port)
     | _, _ => pure (← `($idStr), ← `(Port.mk none none))
+  | _ => Lean.Macro.throwUnsupported
+
+/-- Parse a record field into a RecordCell term -/
+partial def parseRecordField (field : Lean.TSyntax `recordField) : Lean.MacroM (Lean.TSyntax `term) := do
+  match field with
+  | `(recordField| $port:str : $label:str) =>
+    `(RecordCell.field (some $port) $label)
+  | `(recordField| $label:str) =>
+    `(RecordCell.field none $label)
+  | `(recordField| { $fields:recordField,* }) => do
+    let fieldArr := fields.getElems
+    let mut cellList ← `([])
+    for f in fieldArr.reverse do
+      let cell ← parseRecordField f
+      cellList ← `($cell :: $cellList)
+    `(RecordCell.row $cellList)
   | _ => Lean.Macro.throwUnsupported
 
 /-- Parse subgraph elements -/
@@ -319,6 +345,24 @@ macro_rules
           for nodeId in nodeArr do
             sgExpr ← `(Subgraph.addNode $sgExpr (Node.new $nodeId))
           `(Graph.addSubgraph $graphExpr $sgExpr)
+        -- Record node: record "id" ["port" : "label", "label2", ...]
+        | `(dotElem| record $id:str [ $fields:recordField,* ] $kvs:dotKV*) => do
+          let fieldArr := fields.getElems
+          let mut cellList ← `([])
+          for f in fieldArr.reverse do
+            let cell ← parseRecordField f
+            cellList ← `($cell :: $cellList)
+          let attrList ← parseKVs kvs
+          `(Graph.addRecordNode $graphExpr ({ id := $id, cells := $cellList, attrs := $attrList } : RecordNode))
+        -- Mrecord (rounded corners): mrecord "id" [...]
+        | `(dotElem| mrecord $id:str [ $fields:recordField,* ] $kvs:dotKV*) => do
+          let fieldArr := fields.getElems
+          let mut cellList ← `([])
+          for f in fieldArr.reverse do
+            let cell ← parseRecordField f
+            cellList ← `($cell :: $cellList)
+          let attrList ← parseKVs kvs
+          `(Graph.addRecordNode $graphExpr ({ id := $id, cells := $cellList, rounded := true, attrs := $attrList } : RecordNode))
         | `(dotElem| $key:ident $val:str) =>
           `(Graph.withAttr $graphExpr (Attr.mk $(Lean.quote (toString key.getId)) $val))
         | _ => Lean.Macro.throwUnsupported
