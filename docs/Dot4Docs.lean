@@ -193,6 +193,134 @@ def recordGraph := dot {
 }
 ```
 
+# Edge Syntax Sugar
+%%%
+tag := "edge-sugar"
+%%%
+
+## Edge Chains
+
+Create sequential connections with `chain`:
+
+```lean
+def pipeline := dot {
+  digraph "Pipeline"
+  rankdir "LR"
+
+  node "A" label="Input"
+  node "B" label="Process"
+  node "C" label="Transform"
+  node "D" label="Output"
+
+  chain ["A", "B", "C", "D"]  -- A → B → C → D
+}
+```
+
+## Bidirectional Edges
+
+Use `↔` or `<->` for two-way connections:
+
+```lean
+def clientServer := dot {
+  digraph "Communication"
+
+  node "client" label="Client"
+  node "server" label="Server"
+
+  edge "client" ↔ "server" label="request/response"
+}
+```
+
+## Fanout Edges
+
+Connect one node to many targets with `fanout`:
+
+```lean
+def hubAndSpoke := dot {
+  digraph "Hub"
+
+  node "hub" label="Router" shape="circle"
+  node "a" label="Node A"
+  node "b" label="Node B"
+  node "c" label="Node C"
+
+  fanout "hub" → ["a", "b", "c"]
+}
+```
+
+# Strict Graphs
+%%%
+tag := "strict"
+%%%
+
+Use `strict digraph` or `strict graph` to prevent multi-edges between the same node pair:
+
+```lean
+def noMultiEdges := dot {
+  strict digraph "StrictMode"
+
+  node "A" label="Source"
+  node "B" label="Target"
+
+  -- Only the last edge is kept in strict mode
+  edge "A" → "B" label="first"
+  edge "A" → "B" label="second"  -- This one wins
+}
+```
+
+# Cluster Edge Routing
+%%%
+tag := "cluster-edges"
+%%%
+
+Route edges to cluster boundaries using lhead/ltail (requires `compound=true`):
+
+```lean
+def clusterToCluster :=
+  let src := Subgraph.cluster "source"
+    |>.withAttr (Attr.mk "label" "Source")
+    |>.addNode { id := "s1", attrs := [] }
+
+  let dst := Subgraph.cluster "target"
+    |>.withAttr (Attr.mk "label" "Target")
+    |>.addNode { id := "t1", attrs := [] }
+
+  -- Edge routes to cluster boundaries, not individual nodes
+  let clusterEdge := (Edge.new "s1" "t1")
+    |>.fromCluster "source"
+    |>.toCluster "target"
+
+  Graph.digraph "ClusterRouting"
+    |>.withAttr (Attr.compound true)
+    |>.addSubgraph src
+    |>.addSubgraph dst
+    |>.addEdge clusterEdge
+```
+
+# Compile-Time Validation
+%%%
+tag := "validation"
+%%%
+
+Dot4 validates attribute values at compile time:
+
+```lean
+-- These compile (valid values):
+def valid := dot {
+  digraph "Valid"
+  node "n" shape="box" fillcolor="#FF5733"
+}
+
+-- These would fail to compile:
+-- shape="circl"     -- Error: Invalid shape
+-- fillcolor="redd"  -- Error: Invalid color
+-- rankdir="UP"      -- Error: Invalid rankdir
+```
+
+Validation covers: `shape`, `color`, `fillcolor`, `fontcolor`, `bgcolor`, `rankdir`, `rank`, `arrowhead`, `arrowtail`, `dir`, `splines`, `layout`, `overlap`, `labelloc`, `labeljust`, `outputorder`, and `style`.
+
+Unknown attributes pass through for Graphviz compatibility.
+
 # Graph Builders
 %%%
 tag := "builders"
@@ -202,7 +330,7 @@ Create common graph patterns programmatically:
 
 ```lean
 -- Linear chain: A → B → C → D
-def chain := linearGraph "Chain" ["A", "B", "C", "D"]
+def myChain := linearGraph "Chain" ["A", "B", "C", "D"]
 
 -- Star graph: hub connected to all spokes
 def star := starGraph "Star" "hub" ["s1", "s2", "s3"]
@@ -296,5 +424,26 @@ tag := "api"
 | `RankDir` | `TB`, `BT`, `LR`, `RL` |
 | `NodeStyle` | `filled`, `dashed`, `bold`, `rounded`, ... |
 | `EdgeStyle` | `solid`, `dashed`, `dotted`, `bold`, ... |
-| `SplineType` | `ortho`, `spline`, `polyline`, ... |
+| `SplineType` | `ortho`, `spline`, `polyline`, `curved`, ... |
+| `LayoutEngine` | `dot`, `neato`, `twopi`, `circo`, `fdp`, `sfdp`, ... |
+| `OverlapMode` | `true`, `false`, `scale`, `ortho`, `compress`, ... |
+| `LabelLoc` | `t` (top), `c` (center), `b` (bottom) |
+| `LabelJust` | `l` (left), `c` (center), `r` (right) |
+
+## Edge Helpers
+
+| Method | Description |
+|--------|-------------|
+| `Edge.toCluster` | Route edge head to cluster boundary |
+| `Edge.fromCluster` | Route edge tail from cluster boundary |
+| `Edge.betweenClusters` | Set both lhead and ltail |
+
+## DSL Syntax
+
+| Syntax | Description |
+|--------|-------------|
+| `chain ["A", "B", "C"]` | Create edge chain A → B → C |
+| `edge "A" ↔ "B"` | Bidirectional edge (two arrows) |
+| `fanout "hub" → ["a", "b"]` | One-to-many edges |
+| `strict digraph "Name"` | No multi-edges allowed |
 
