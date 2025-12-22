@@ -10,3 +10,4 @@ import Dot4.Advanced
 import Dot4.Validation
 import Dot4.Syntax
 import Dot4.Widget
+import Dot4.Parser

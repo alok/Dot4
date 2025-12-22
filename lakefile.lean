@@ -9,6 +9,8 @@ package Dot4 where
     ⟨`linter.missingDocs, true⟩,
     ⟨`doc.verso, true⟩
   ]
+  -- Disable reservoir fetching to force local builds
+  preferReleaseBuild := false
 
 
 require proofwidgets from git
@@ -28,6 +30,9 @@ lean_exe «dot4-test» where
 
 lean_exe «test-new-features» where
   root := `test.TestNewFeatures
+
+lean_exe «test-parser» where
+  root := `test.TestParser
 
 -- Widget build configuration
 def npmCmd : String :=
