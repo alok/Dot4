@@ -7,6 +7,9 @@ package Dot4 where
 require proofwidgets from git
   "https://github.com/leanprover-community/ProofWidgets4" @ "v0.0.83"
 
+require hexluthor from git
+  "https://github.com/alok/HexLuthor" @ "main"
+
 lean_lib Dot4
 
 @[default_target]

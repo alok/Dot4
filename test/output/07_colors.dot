@@ -1,12 +1,12 @@
 digraph "Test07_Colors" {
     rankdir="LR";
-    bgcolor="#2e3440";
+    bgcolor="#2E3440";
 
-    "nord1" [label="Nord Frost", shape="box", fillcolor="#88c0d0", fontcolor="#eceff4", style="filled"];
-    "nord2" [label="Nord Aurora", shape="box", fillcolor="#a3be8c", fontcolor="#2e3440", style="filled"];
-    "solar" [label="Solarized", shape="box", fillcolor="#268bd2", fontcolor="#fdf6e3", style="filled"];
-    "cat" [label="Catppuccin", shape="box", fillcolor="#cba6f7", fontcolor="#11111b", style="filled"];
-    "nord1" -> "nord2" [color="#81a1c1"];
-    "nord2" -> "solar" [color="#2aa198"];
-    "solar" -> "cat" [color="#f5c2e7"];
+    "nord1" [label="Nord Frost", shape="box", fillcolor="#88C0D0", fontcolor="#ECEFF4", style="filled"];
+    "nord2" [label="Nord Aurora", shape="box", fillcolor="#A3BE8C", fontcolor="#2E3440", style="filled"];
+    "solar" [label="Solarized", shape="box", fillcolor="#268BD2", fontcolor="#FDF6E3", style="filled"];
+    "cat" [label="Catppuccin", shape="box", fillcolor="#CBA6F7", fontcolor="#11111B", style="filled"];
+    "nord1" -> "nord2" [color="#81A1C1"];
+    "nord2" -> "solar" [color="#2AA198"];
+    "solar" -> "cat" [color="#F5C2E7"];
 }
