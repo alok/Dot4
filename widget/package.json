@@ -1,0 +1,25 @@
+{
+  "name": "dot4-widget",
+  "version": "1.0.0",
+  "description": "Graphviz visualization widget for Dot4",
+  "type": "module",
+  "scripts": {
+    "build": "npx rollup --config --bundleConfigAsCjs",
+    "clean": "rm -rf ../build/js/*"
+  },
+  "devDependencies": {
+    "@babel/preset-react": "^7.22.15",
+    "@rollup/plugin-babel": "^6.0.4",
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-replace": "^5.0.5",
+    "@rollup/plugin-terser": "^0.4.4",
+    "rollup": "^4.1.5"
+  },
+  "dependencies": {
+    "@leanprover/infoview": "~0.4.3",
+    "@viz-js/viz": "^3.2.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}
