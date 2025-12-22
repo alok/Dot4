@@ -247,6 +247,16 @@ def ranksep (r : Float) : Attr := ⟨"ranksep", toString r⟩
 def concentrate (b : Bool) : Attr := ⟨"concentrate", if b then "true" else "false"⟩
 def compound (b : Bool) : Attr := ⟨"compound", if b then "true" else "false"⟩
 
+-- fdp/sfdp layout engine parameters
+/-- Ideal edge length for fdp/sfdp layouts -/
+def k (length : Float) : Attr := ⟨"K", toString length⟩
+/-- Convergence threshold for fdp/sfdp (smaller = more accurate, slower) -/
+def epsilon (threshold : Float) : Attr := ⟨"epsilon", toString threshold⟩
+/-- Random seed or initialization for fdp/sfdp ("random", "self", or seed number) -/
+def start (init : String) : Attr := ⟨"start", init⟩
+/-- Force damping factor for fdp/neato (0.0-1.0) -/
+def damping (factor : Float) : Attr := ⟨"Damping", toString factor⟩
+
 /-- Logical head cluster for compound edges (requires compound=true) -/
 def lhead (cluster : String) : Attr := ⟨"lhead", cluster⟩
 /-- Logical tail cluster for compound edges (requires compound=true) -/

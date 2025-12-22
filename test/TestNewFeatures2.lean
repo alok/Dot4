@@ -191,5 +191,27 @@ def testPolygonShapes : Graph :=
 
 #eval IO.println testPolygonShapes.toDot
 
+-- Test fdp/sfdp layout parameters
+def testFdpLayout : Graph :=
+  Graph.graph "FdpLayout"  -- undirected graph for fdp
+  |>.withAttr (Attr.layout "fdp")
+  |>.withAttr (Attr.k 2.0)  -- ideal edge length
+  |>.withAttr (Attr.epsilon 0.01)  -- convergence threshold
+  |>.withAttr (Attr.start "random")  -- random initialization
+  -- Create a small network
+  |>.addNode { id := "center", label := some "Hub" }
+  |>.addNode { id := "n1", label := some "Node 1" }
+  |>.addNode { id := "n2", label := some "Node 2" }
+  |>.addNode { id := "n3", label := some "Node 3" }
+  |>.addNode { id := "n4", label := some "Node 4" }
+  |>.addEdge { src := "center", dst := "n1" }
+  |>.addEdge { src := "center", dst := "n2" }
+  |>.addEdge { src := "center", dst := "n3" }
+  |>.addEdge { src := "center", dst := "n4" }
+  |>.addEdge { src := "n1", dst := "n2" }
+  |>.addEdge { src := "n3", dst := "n4" }
+
+#eval IO.println testFdpLayout.toDot
+
 -- All tests pass if this file compiles
 #check "All new features compile successfully!"
