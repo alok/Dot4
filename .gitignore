@@ -1,1 +1,5 @@
 /.lake
+/docs/.lake
+/docs/_out
+/docs/lake-manifest.json
+.claude/
