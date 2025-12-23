@@ -3,13 +3,15 @@ import Dot4
 /-!
 # Dot4 Widget Demo
 
-Open this file in VS Code with the Lean extension to see the graphs rendered
-in the infoview panel.
+Open this file in VS Code with the Lean extension to see graphs rendered
+as SVG in the infoview panel.
+
+Use `#dot myGraph` to render any Graph.
 -/
 
 open Dot4
 
--- Basic graph example
+/-- Basic graph example. -/
 def basicGraph := dot {
   digraph "Hello"
   rankdir "LR"
@@ -20,10 +22,9 @@ def basicGraph := dot {
   edge "A" → "B"
 }
 
--- Show the graph in infoview (hover over this line)
 #dot basicGraph
 
--- More complex example with clusters
+/-- Architecture diagram with clusters. -/
 def architectureGraph := dot {
   digraph "Architecture"
   rankdir "TB"
@@ -54,7 +55,7 @@ def architectureGraph := dot {
 -- Raw DOT string
 #dot_raw "digraph { rankdir=LR; a -> b -> c -> d }"
 
--- Fanout example
+/-- Fanout example. -/
 def fanoutGraph := dot {
   digraph "Fanout"
 

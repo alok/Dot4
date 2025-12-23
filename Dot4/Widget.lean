@@ -2,119 +2,102 @@ import Dot4.Basic
 import Dot4.Render
 import Lean
 import ProofWidgets.Component.Basic
-import ProofWidgets.Data.Html
 import ProofWidgets.Presentation.Expr
 
 /-!
-# Dot4 Interactive Widget
+# Dot4 Widget
 
-Provides interactive graph visualization in the VS Code infoview using viz.js.
-- Use `#dot myGraph` to render a graph in the infoview panel
-- Click on any `Graph` expression to see it visualized in the infoview
+Renders Dot4 graphs as SVG in the VS Code infoview using Graphviz (viz.js).
+
+## Commands
+- {lit}`#dot myGraph` - Render graph as SVG
+- {lit}`#dot_raw "digraph { a -> b }"` - Render raw DOT string
 -/
 
 namespace Dot4
 
 open Lean Widget Server Elab Command Meta Term
-open ProofWidgets Jsx
 
-/-- Props for the Dot4 visualization widget -/
-structure DotWidgetProps where
-  /-- The DOT source code to render -/
+/-! ## Graphviz Widget (viz.js) -/
+
+/-- Props for the Graphviz widget. -/
+structure DotVisualizationProps where
+  /-- The DOT source string to render. -/
   dot : String
-  deriving Server.RpcEncodable
+  deriving Inhabited, Server.RpcEncodable
 
-/-- The widget module containing the viz.js-based graph renderer -/
+/-- Widget component using viz.js (Graphviz compiled to WASM). -/
 @[widget_module]
-def DotVisualization : Component DotWidgetProps where
+def DotVisualization : ProofWidgets.Component DotVisualizationProps where
   javascript := include_str ".." / "build" / "js" / "dotVisualization.js"
 
-/-- Helper to evaluate a Graph.toDot expression -/
+/-! ## Commands -/
+
+/-- Evaluate Graph.toDot at compile time. -/
 unsafe def evalGraphToDot (stx : Syntax) : TermElabM String := do
   let expr ← elabTerm stx (some (Lean.mkConst ``Graph))
   let toDotExpr ← mkAppM ``Graph.toDot #[expr]
-  -- Create a thunk and evaluate it
   let strExpr ← whnf toDotExpr
-  -- Use native evaluation
   evalExpr String (Lean.mkConst ``String) strExpr
 
-/-- Display a Dot4 graph in the infoview panel.
+/-- Render a Dot4 graph as SVG in the infoview.
 
-Usage: `#dot myGraph`
-
-This renders the graph using Graphviz (via viz.js) directly in VS Code.
+Usage: {lit}`#dot myGraph`
 -/
 syntax (name := showDotCmd) "#dot " term : command
 
-/-- Command elaborator for the #dot command -/
+/-- Command elaborator for {lit}`#dot`. -/
 @[command_elab showDotCmd]
 unsafe def elabShowDotCmd : CommandElab := fun
   | stx@`(#dot $g:term) => do
-    -- Elaborate the graph and extract DOT string
     let dotStr ← liftTermElabM <| evalGraphToDot g
-    -- Save the widget with the DOT string as props
-    let props : DotWidgetProps := { dot := dotStr }
     liftCoreM <| Widget.savePanelWidgetInfo
       (hash DotVisualization.javascript)
-      (return ← Server.rpcEncode props)
+      (return (← rpcEncode ({ dot := dotStr } : DotVisualizationProps)))
       stx
   | stx => throwError "Unexpected syntax {stx}."
 
-/-- Display a raw DOT string in the infoview panel. -/
+/-- Render a raw DOT string as SVG.
+
+Usage: {lit}`#dot_raw "digraph { a -> b }"`
+-/
 syntax (name := showDotRawCmd) "#dot_raw " str : command
 
-/-- Command elaborator for the {lit}`#dot_raw` command -/
+/-- Command elaborator for {lit}`#dot_raw`. -/
 @[command_elab showDotRawCmd]
 def elabShowDotRawCmd : CommandElab := fun
   | stx@`(#dot_raw $s:str) => do
     let dotStr := s.getString
-    let props : DotWidgetProps := { dot := dotStr }
     liftCoreM <| Widget.savePanelWidgetInfo
       (hash DotVisualization.javascript)
-      (return ← Server.rpcEncode props)
+      (return (← rpcEncode ({ dot := dotStr } : DotVisualizationProps)))
       stx
   | stx => throwError "Unexpected syntax {stx}."
 
-/-! ## Expression Presenter for Graph type -/
+/-! ## Expression Presenter -/
 
-/-- Evaluate a Graph expression to get its DOT string representation -/
-unsafe def evalGraphExpr (e : Expr) : MetaM (Option String) := do
-  -- Check if expression has type Graph
-  let ty ← inferType e
-  let graphConst := Lean.mkConst ``Graph
-  if !(← isDefEq ty graphConst) then
-    return none
-  -- Build Graph.toDot application
+/-- Evaluate Graph.toDot using runtime evaluation. -/
+unsafe def evalGraphUnsafe (e : Expr) : MetaM String := do
   let toDotExpr ← mkAppM ``Graph.toDot #[e]
-  -- Reduce and evaluate
-  let reduced ← whnf toDotExpr
-  try
-    let result ← evalExpr String (Lean.mkConst ``String) reduced
-    return some result
-  catch _ =>
-    return none
+  Lean.Meta.evalExpr' String ``String toDotExpr
 
-/-- Safe wrapper for graph evaluation -/
-@[implemented_by evalGraphExpr]
-opaque evalGraphExprSafe : Expr → MetaM (Option String)
+/-- Safe wrapper for evalGraphUnsafe. -/
+@[implemented_by evalGraphUnsafe]
+opaque evalGraph (e : Expr) : MetaM String
 
-/-- Expression presenter that visualizes Graph expressions in the infoview.
-Click on any Graph expression to see its visualization. -/
+/-- Expression presenter for Graph values in the infoview. -/
 @[expr_presenter]
-def graphPresenter : ExprPresenter where
-  userName := "Graph Visualization"
-  layoutKind := .block
+def graphPresenter : ProofWidgets.ExprPresenter where
+  userName := "Dot4 Graph"
+  layoutKind := .inline
   present e := do
-    -- Check if it's a Graph type
     let ty ← inferType e
-    unless (← isDefEq ty (Lean.mkConst ``Graph)) do
-      throwError "Not a Graph expression"
-    -- Try to evaluate the graph
-    match ← evalGraphExprSafe e with
-    | some dotStr =>
-      -- Return widget using JSX syntax
-      return <DotVisualization dot={dotStr} />
-    | none =>
-      throwError "Could not evaluate Graph expression"
+    let_expr Dot4.Graph := ty | return .text s!"{← ppExpr e}"
+    try
+      let dotStr ← evalGraph e
+      let preview := if dotStr.length > 50 then dotStr.take 50 ++ "…" else dotStr
+      return .text s!"📊 {preview}"
+    catch _ =>
+      return .text s!"{← ppExpr e}"
 
 end Dot4

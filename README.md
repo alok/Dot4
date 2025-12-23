@@ -34,6 +34,28 @@ def myGraph := dot {
 | Missing quote | Cryptic parser error | **Lean syntax errors** |
 | Refactoring | Find & replace | **IDE rename support** |
 
+## Live Preview in VS Code
+
+Dot4 renders graphs as SVG directly in the VS Code infoview using Graphviz (viz.js):
+
+```lean
+def myGraph := dot {
+  digraph "Hello"
+  node "A" label="Hello"
+  node "B" label="World"
+  edge "A" → "B"
+}
+
+#dot myGraph  -- Renders as SVG in infoview!
+```
+
+![Dot4 Widget Demo](docs/widget-demo.png)
+
+Also works with raw DOT strings:
+```lean
+#dot_raw "digraph { rankdir=LR; a -> b -> c }"
+```
+
 ## Features
 
 ### DSL Syntax

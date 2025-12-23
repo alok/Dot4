@@ -21,7 +21,7 @@ def simpleGraph : Graph := dot {
   edge "A" → "B"
   edge "B" → "C"
 }
-
+#dot simpleGraph
 /-- Example 2: State machine with styling -/
 def stateMachine : Graph := dot {
   digraph "StateMachine"
@@ -156,14 +156,14 @@ def colorfulGraph : Graph :=
 /-- Example 7: Type-safe shapes (try changing to an invalid shape - it won't compile!) -/
 def shapesShowcase : Graph :=
   let shapes := [
-    ("box", Shape.box),
-    ("circle", Shape.circle),
-    ("diamond", Shape.diamond),
-    ("hexagon", Shape.hexagon),
-    ("star", Shape.star),
-    ("cylinder", Shape.cylinder),
-    ("folder", Shape.folder),
-    ("component", Shape.component)
+    ("box", .box),
+    ("circle", .circle),
+    ("diamond", .diamond),
+    ("hexagon", .hexagon),
+    ("star", .star),
+    ("cylinder", .cylinder),
+    ("folder", .folder),
+    ("component", .component)
   ]
   let g := Graph.digraph "Shapes" |>.withAttr (Attr.rankdirT RankDir.LR)
   shapes.foldl (fun acc (name, shape) =>
