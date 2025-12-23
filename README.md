@@ -80,6 +80,25 @@ Also works with raw DOT strings:
 - **Clusters**: `cluster "name" { ... }` for grouped subgraphs
 - **Port Syntax**: `edge "a":port → "b":n` for record nodes and compass points
 - **Defaults**: `node_defaults shape="box"` / `edge_defaults arrowsize="0.8"`
+- **Interpolation**: Use `$(expr)` to embed Lean expressions (like `json%`)
+
+### Interpolation
+
+Embed Lean expressions anywhere using `$(expr)` syntax:
+
+```lean
+def version := "v2.0"
+def serverName := "Production"
+
+def myGraph := dot {
+  digraph $(s!"System_{version}")  -- Interpolated graph name
+
+  node "server" label=$(serverName)  -- Interpolated attribute value
+  node $(makeNodeId 1) label="Task"  -- Interpolated node ID
+
+  edge $(srcNode) → $(dstNode)  -- Interpolated edge endpoints
+}
+```
 
 ### Type Safety
 - **60+ validated shapes**: `Shape.box`, `Shape.circle`, `Shape.diamond`, ...
