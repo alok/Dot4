@@ -279,6 +279,119 @@ partial def stronglyConnectedComponents (g : Graph) : List (List String) :=
     ([], [])
   sccs
 
+/-- DFS traversal with pre-order and post-order callbacks -/
+partial def dfs (g : Graph) (startId : String)
+    (preVisit : String → Unit := fun _ => ())
+    (postVisit : String → Unit := fun _ => ()) : List String :=
+  let rec go (curr : String) (visited : List String) : List String :=
+    if visited.contains curr then visited
+    else
+      let _ := preVisit curr
+      let newVisited := curr :: visited
+      let afterSuccs := (g.successors curr).foldl
+        (fun v succ => go succ v)
+        newVisited
+      let _ := postVisit curr
+      afterSuccs
+  if g.getNodeIds.contains startId then go startId []
+  else []
+
+/-- BFS traversal with level tracking -/
+partial def bfsWithLevels (g : Graph) (startId : String) : List (String × Nat) :=
+  let rec go (queue : List (String × Nat)) (visited : List String)
+            (result : List (String × Nat)) : List (String × Nat) :=
+    match queue with
+    | [] => result.reverse
+    | (curr, level) :: rest =>
+      if visited.contains curr then go rest visited result
+      else
+        let succs := g.successors curr
+        let newItems := succs.filterMap fun s =>
+          if visited.contains s || queue.any (·.1 == s)
+          then none
+          else some (s, level + 1)
+        go (rest ++ newItems) (curr :: visited) ((curr, level) :: result)
+  if g.getNodeIds.contains startId then go [(startId, 0)] [] []
+  else []
+
+/-- Get connected components (treating graph as undirected) -/
+partial def connectedComponents (g : Graph) : List (List String) :=
+  let allNodes := g.getNodeIds
+  -- Get neighbors in both directions (undirected)
+  let neighbors (nodeId : String) : List String :=
+    (g.successors nodeId) ++ (g.predecessors nodeId)
+  -- BFS to find component
+  let rec findComponent (start : String) (visited : List String) : List String × List String :=
+    let rec bfs (queue : List String) (v : List String) (comp : List String)
+               : List String × List String :=
+      match queue with
+      | [] => (v, comp)
+      | curr :: rest =>
+        if v.contains curr then bfs rest v comp
+        else
+          let newV := curr :: v
+          let ns := (neighbors curr).filter (fun n => !v.contains n && !queue.contains n)
+          bfs (rest ++ ns) newV (curr :: comp)
+    bfs [start] visited []
+  -- Find all components
+  let (_, components) := allNodes.foldl
+    (fun (acc : List String × List (List String)) n =>
+      let (visited, comps) := acc
+      if visited.contains n then acc
+      else
+        let (newVisited, comp) := findComponent n visited
+        (newVisited, comp :: comps))
+    ([], [])
+  components
+
+/-- Check if graph is connected (as undirected) -/
+def isConnected (g : Graph) : Bool :=
+  g.connectedComponents.length <= 1
+
+/-- Compute transitive closure (all reachable pairs) -/
+partial def transitiveClosure (g : Graph) : List (String × String) :=
+  let allNodes := g.getNodeIds
+  allNodes.flatMap fun start =>
+    (g.reachable start).filterMap fun dest =>
+      if start != dest then some (start, dest) else none
+
+/-- Find all simple paths between two nodes (no repeated nodes) -/
+partial def allPaths (g : Graph) (startId endId : String) (maxLen : Nat := 100) : List (List String) :=
+  let rec go (curr : String) (path : List String) (depth : Nat) : List (List String) :=
+    if depth > maxLen then []
+    else if curr == endId then [path.reverse]
+    else
+      (g.successors curr).flatMap fun succ =>
+        if path.contains succ then []  -- No cycles in simple paths
+        else go succ (succ :: path) (depth + 1)
+  if g.getNodeIds.contains startId && g.getNodeIds.contains endId
+  then go startId [startId] 0
+  else []
+
+/-- Compute graph diameter (longest shortest path) -/
+partial def diameter (g : Graph) : Option Nat :=
+  let allNodes := g.getNodeIds
+  if allNodes.isEmpty then none
+  else
+    let maxDist := allNodes.foldl (fun acc start =>
+      allNodes.foldl (fun acc2 «end» =>
+        match g.shortestPath start «end» with
+        | some path => max acc2 (path.length - 1)
+        | none => acc2) acc) 0
+    some maxDist
+
+/-- Check if there's a path from src to dst -/
+def hasPath (g : Graph) (src dst : String) : Bool :=
+  (g.reachable src).contains dst
+
+/-- Get all leaf nodes (nodes with no outgoing edges) -/
+def leaves (g : Graph) : List String :=
+  g.getNodeIds.filter (fun n => g.outDegree n == 0)
+
+/-- Get all root nodes (nodes with no incoming edges) -/
+def roots (g : Graph) : List String :=
+  g.getNodeIds.filter (fun n => g.inDegree n == 0)
+
 end Graph
 
 end Dot4
