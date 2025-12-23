@@ -218,3 +218,45 @@ Comprehensive graph analysis algorithms.
 #eval IO.println s!"Is connected: {dagGraph.isConnected}"
 #eval IO.println s!"Roots: {dagGraph.roots}"
 #eval IO.println s!"Leaves: {dagGraph.leaves}"
+
+/-! ## Graph Templates
+
+Pre-configured graph types for common use cases.
+-/
+
+/-- Flowchart example using template -/
+def loginFlow := flowchart "Login"
+  |>.addTerminal "start" "Start"
+  |>.addProcess "input" "Enter Credentials"
+  |>.addDecision "valid" "Valid?"
+  |>.addProcess "grant" "Grant Access"
+  |>.addProcess "deny" "Show Error"
+  |>.addTerminal "finish" "End"
+  |>.addChain ["start", "input", "valid"]
+  |>.addEdge { src := "valid", dst := "grant", label := some "Yes" }
+  |>.addEdge { src := "valid", dst := "deny", label := some "No" }
+  |>.addChain ["grant", "finish"]
+  |>.addEdge { src := "deny", dst := "input" }
+
+#dot loginFlow
+
+/-- State machine example -/
+def trafficLight := stateMachine "TrafficLight"
+  |>.addState "red" "Red" (entry := some "stopCars()")
+  |>.addState "yellow" "Yellow"
+  |>.addState "green" "Green" (entry := some "allowCars()")
+  |>.addTransition "red" "green" "timer" (guard := some "30s")
+  |>.addTransition "green" "yellow" "timer" (guard := some "25s")
+  |>.addTransition "yellow" "red" "timer" (guard := some "5s")
+
+#dot trafficLight
+
+/-- Class diagram example -/
+def animalClasses := classDiagram "Animals"
+  |>.addClass "animal" "Animal" ["name: String", "age: Int"] ["speak()", "move()"]
+  |>.addClass "dog" "Dog" ["breed: String"] ["bark()", "fetch()"]
+  |>.addClass "cat" "Cat" ["indoor: Bool"] ["meow()", "scratch()"]
+  |>.addInheritance "dog" "animal"
+  |>.addInheritance "cat" "animal"
+
+#dot animalClasses
