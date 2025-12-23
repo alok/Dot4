@@ -222,6 +222,112 @@ def htmlRow (cells : List HtmlCell) : HtmlRow := { cells }
 /-- Quick table constructor -/
 def htmlTable (rows : List HtmlRow) : HtmlTable := { rows }
 
+/-! ## Graph Templates -/
+
+/-- Create a flowchart with decision nodes and process nodes -/
+def flowchart (name : String) : Graph :=
+  Graph.digraph name
+  |>.withAttr (Attr.rankdir "TB")
+  |>.withNodeDefaults [Attr.shape "box", Attr.style "rounded"]
+
+/-- Create a state machine diagram -/
+def stateMachine (name : String) : Graph :=
+  Graph.digraph name
+  |>.withAttr (Attr.rankdir "LR")
+  |>.withNodeDefaults [Attr.shape "circle"]
+
+/-- Create an entity-relationship diagram -/
+def erDiagram (name : String) : Graph :=
+  Graph.digraph name
+  |>.withAttr (Attr.rankdir "TB")
+  |>.withAttr (Attr.splines "ortho")
+  |>.withNodeDefaults [Attr.shape "record"]
+
+/-- Create a class diagram (UML-style) -/
+def classDiagram (name : String) : Graph :=
+  Graph.digraph name
+  |>.withAttr (Attr.rankdir "BT")  -- Bottom to top for inheritance
+  |>.withAttr (Attr.splines "ortho")
+  |>.withNodeDefaults [Attr.shape "record"]
+
+/-- Create a dependency graph -/
+def dependencyGraph (name : String) : Graph :=
+  Graph.digraph name
+  |>.withAttr (Attr.rankdir "LR")
+  |>.withNodeDefaults [Attr.shape "box", Attr.style "rounded,filled", Attr.fillcolor "#e8e8e8"]
+  |>.withEdgeDefaults [Attr.arrowsize 0.7]
+
+/-- Create a tree layout graph -/
+def treeGraph (name : String) : Graph :=
+  Graph.digraph name
+  |>.withAttr (Attr.rankdir "TB")
+  |>.withAttr (Attr.splines "line")
+  |>.withNodeDefaults [Attr.shape "ellipse"]
+
+/-- Create a network topology diagram -/
+def networkDiagram (name : String) : Graph :=
+  Graph.graph name  -- Undirected
+  |>.withAttr (Attr.layout "neato")
+  |>.withAttr (Attr.overlap "false")
+  |>.withNodeDefaults [Attr.shape "box3d"]
+
+/-- Add a decision diamond node to a flowchart -/
+def Graph.addDecision (g : Graph) (id : String) (question : String) : Graph :=
+  g.addNode { id, label := some question, attrs := [Attr.shape "diamond"] }
+
+/-- Add a process box node to a flowchart -/
+def Graph.addProcess (g : Graph) (id : String) (action : String) : Graph :=
+  g.addNode { id, label := some action, attrs := [Attr.shape "box"] }
+
+/-- Add a start/end node to a flowchart -/
+def Graph.addTerminal (g : Graph) (id : String) (text : String) : Graph :=
+  g.addNode { id, label := some text, attrs := [Attr.shape "ellipse"] }
+
+/-- Add a state with entry/exit actions -/
+def Graph.addState (g : Graph) (id : String) (name : String)
+    (entry : Option String := none) (exit : Option String := none) : Graph :=
+  let label := match entry, exit with
+    | some e, some x => s!"{name}|entry: {e}|exit: {x}"
+    | some e, none => s!"{name}|entry: {e}"
+    | none, some x => s!"{name}|exit: {x}"
+    | none, none => name
+  let shape := if entry.isSome || exit.isSome then "record" else "ellipse"
+  g.addNode { id, label := some label, attrs := [Attr.shape shape] }
+
+/-- Add a labeled transition edge -/
+def Graph.addTransition (g : Graph) (src dst : String) (event : String)
+    (guard : Option String := none) (action : Option String := none) : Graph :=
+  let label := match guard, action with
+    | some gd, some act => s!"{event} [{gd}] / {act}"
+    | some gd, none => s!"{event} [{gd}]"
+    | none, some act => s!"{event} / {act}"
+    | none, none => event
+  g.addEdge { src, dst, label := some label }
+
+/-- Add a class node (UML record format) -/
+def Graph.addClass (g : Graph) (id : String) (name : String)
+    (attrs : List String := []) (methods : List String := []) : Graph :=
+  let attrSection := if attrs.isEmpty then "" else "|" ++ "|".intercalate attrs
+  let methodSection := if methods.isEmpty then "" else "|" ++ "|".intercalate methods
+  let label := s!"{name}{attrSection}{methodSection}"
+  g.addNode { id, label := some label, attrs := [Attr.shape "record"] }
+
+/-- Add an inheritance edge (empty arrowhead) -/
+def Graph.addInheritance (g : Graph) (child parent : String) : Graph :=
+  g.addEdge { src := child, dst := parent, attrs := [Attr.arrowhead "empty"] }
+
+/-- Add a composition edge (filled diamond) -/
+def Graph.addComposition (g : Graph) (whole part : String) : Graph :=
+  g.addEdge { src := whole, dst := part, attrs := [Attr.arrowtail "diamond", Attr.dir "back"] }
+
+/-- Add an aggregation edge (empty diamond) -/
+def Graph.addAggregation (g : Graph) (whole part : String) : Graph :=
+  g.addEdge { src := whole, dst := part, attrs := [Attr.arrowtail "odiamond", Attr.dir "back"] }
+
+/-- Add a dependency edge (dashed arrow) -/
+def Graph.addDependency (g : Graph) (dependent dependency : String) : Graph :=
+  g.addEdge { src := dependent, dst := dependency, attrs := [Attr.style "dashed"] }
+
 /-! ## Graph Diff -/
 
 /-- A node change in a graph diff -/
