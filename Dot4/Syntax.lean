@@ -19,6 +19,8 @@ syntax ident "=" str : dotKV
 syntax ident "=" ident : dotKV
 /-- Attribute assignment: {lit}`key=num` -/
 syntax ident "=" num : dotKV
+/-- Attribute assignment: {lit}`key=float` for height, width, etc. -/
+syntax ident "=" scientific : dotKV
 
 /-- Port and compass point syntax for edge endpoints -/
 declare_syntax_cat dotPort
@@ -147,6 +149,11 @@ def parseKVs (kvs : Lean.TSyntaxArray `dotKV) : Lean.MacroM (Lean.TSyntax `term)
       let valStr := toString val.getNat
       Dot4.validateAttrM keyStr valStr (some val.raw)
       `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr))
+    | `(dotKV| $key:ident = $val:scientific) =>
+      let keyStr := toString key.getId
+      let valStr := val.raw.getAtomVal
+      Dot4.validateAttrM keyStr valStr (some val.raw)
+      `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr))
     | _ => Lean.Macro.throwUnsupported
   `([ $[$attrs],* ])
 
@@ -190,6 +197,11 @@ def parseEdgeKVs (kvs : Lean.TSyntaxArray `dotKV) : Lean.MacroM EdgeAttrResult :
     | `(dotKV| $key:ident = $val:num) =>
       let keyStr := toString key.getId
       let valStr := toString val.getNat
+      Dot4.validateAttrM keyStr valStr (some val.raw)
+      regularAttrs := regularAttrs.push (← `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr)))
+    | `(dotKV| $key:ident = $val:scientific) =>
+      let keyStr := toString key.getId
+      let valStr := val.raw.getAtomVal
       Dot4.validateAttrM keyStr valStr (some val.raw)
       regularAttrs := regularAttrs.push (← `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr)))
     | _ => Lean.Macro.throwUnsupported

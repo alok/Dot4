@@ -320,4 +320,3 @@ def main : IO Unit := do
 
   IO.println "━━━ Example 11: Full Architecture ━━━"
   IO.println fullArchitecture.toDot
-

@@ -103,11 +103,15 @@ def graphPresenter : ExprPresenter where
   userName := "Graph Visualization"
   layoutKind := .block
   present e := do
+    -- Check if it's a Graph type
+    let ty ← inferType e
+    unless (← isDefEq ty (Lean.mkConst ``Graph)) do
+      throwError "Not a Graph expression"
     -- Try to evaluate the graph
     match ← evalGraphExprSafe e with
     | some dotStr =>
-      -- Return HTML with embedded component
-      return Html.ofComponent DotVisualization { dot := dotStr } #[]
+      -- Return widget using JSX syntax
+      return <DotVisualization dot={dotStr} />
     | none =>
       throwError "Could not evaluate Graph expression"
 

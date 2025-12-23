@@ -17,6 +17,43 @@ namespace Dot4
 
 open Lean Elab Term Meta
 
+/-- Check if a string is a valid non-negative number (int or float) -/
+def isNonNegativeNumber (s : String) : Bool :=
+  let s := s.trim
+  if s.isEmpty then false
+  else
+    -- Allow leading sign
+    let (sign, rest) := if s.startsWith "-" then (false, s.drop 1)
+                        else if s.startsWith "+" then (true, s.drop 1)
+                        else (true, s)
+    if rest.isEmpty then false
+    else if !sign then false  -- Negative numbers fail
+    else
+      -- Check if rest is digits and at most one decimal point
+      let parts := rest.splitOn "."
+      match parts with
+      | [p] => p.all Char.isDigit && !p.isEmpty
+      | [p1, p2] => (p1.all Char.isDigit || p1.isEmpty) &&
+                    (p2.all Char.isDigit || p2.isEmpty) &&
+                    !(p1.isEmpty && p2.isEmpty)
+      | _ => false
+
+/-- Check if a string is a valid number (int or float, including negative) -/
+def isNumber (s : String) : Bool :=
+  let s := s.trim
+  if s.isEmpty then false
+  else
+    let rest := if s.startsWith "-" || s.startsWith "+" then s.drop 1 else s
+    if rest.isEmpty then false
+    else
+      let parts := rest.splitOn "."
+      match parts with
+      | [p] => p.all Char.isDigit && !p.isEmpty
+      | [p1, p2] => (p1.all Char.isDigit || p1.isEmpty) &&
+                    (p2.all Char.isDigit || p2.isEmpty) &&
+                    !(p1.isEmpty && p2.isEmpty)
+      | _ => false
+
 /-- Validate and optionally transform an attribute key-value pair.
     Returns the validated Attr or throws an error for invalid values. -/
 def validateAttr (key : String) (value : String) : Except String Attr :=
@@ -113,6 +150,59 @@ def validateAttr (key : String) (value : String) : Except String Attr :=
       .ok (Attr.mk key value)
     else
       .error s!"Invalid {key} '{value}'. Cluster names typically start with 'cluster_' (e.g., 'cluster_backend')"
+
+  -- Numeric attributes (must be non-negative numbers)
+  | "fontsize" | "width" | "height" | "penwidth" | "arrowsize"
+  | "nodesep" | "ranksep" | "sep" | "esep"
+  | "len" | "weight" | "minlen" | "sides"
+  | "peripheries" | "nslimit" | "mclimit" | "K" | "maxiter" =>
+    if isNonNegativeNumber value then
+      .ok (Attr.mk key value)
+    else
+      .error s!"Invalid {key} '{value}'. Must be a non-negative number (e.g., 12, 1.5)"
+
+  -- Numeric attributes that allow negative values (distortion, skew)
+  | "distortion" | "skew" =>
+    if isNumber value then
+      .ok (Attr.mk key value)
+    else
+      .error s!"Invalid {key} '{value}'. Must be a number (e.g., 0.5, -0.3)"
+
+  -- Margin/pad can be a single number or "x,y" pair
+  | "margin" | "pad" =>
+    let parts := value.splitOn ","
+    if parts.all (fun p => isNonNegativeNumber p.trim) then
+      .ok (Attr.mk key value)
+    else
+      .error s!"Invalid {key} '{value}'. Must be a number or \"x,y\" pair (e.g., 0.5, \"0.5,0.25\")"
+
+  -- Boolean attributes
+  | "compound" | "concentrate" | "constraint" | "decorate" | "fixedsize"
+  | "headclip" | "tailclip" | "center" | "remincross"
+  | "newrank" | "forcelabels" | "regular"
+  | "diredgeconstraints" | "mosek" | "quadtree" =>
+    if value == "true" || value == "false" then
+      .ok (Attr.mk key value)
+    else
+      .error s!"Invalid {key} '{value}'. Must be 'true' or 'false'"
+
+  -- Ratio validation
+  | "ratio" =>
+    if value == "fill" || value == "compress" || value == "expand" || value == "auto" then
+      .ok (Attr.mk key value)
+    else if isNumber value then
+      .ok (Attr.mk key value)
+    else
+      .error s!"Invalid ratio '{value}'. Must be: fill, compress, expand, auto, or a number"
+
+  -- Orientation validation
+  | "orientation" =>
+    if value == "portrait" || value == "landscape" then
+      .ok (Attr.mk key value)
+    else if isNumber value then
+      .ok (Attr.mk key value)
+    else
+      .error s!"Invalid orientation '{value}'. Must be: portrait, landscape, or angle in degrees"
 
   -- Unknown attributes pass through (Graphviz-compatible)
   | _ => .ok (Attr.mk key value)
