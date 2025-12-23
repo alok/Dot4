@@ -34,6 +34,9 @@ lean_exe «test-new-features» where
 lean_exe «test-parser» where
   root := `test.TestParser
 
+lean_exe «test-new-syntax» where
+  root := `test.TestNewSyntax
+
 -- Widget build configuration
 def npmCmd : String :=
   if System.Platform.isWindows then "npm.cmd" else "npm"

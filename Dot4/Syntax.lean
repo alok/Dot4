@@ -13,8 +13,12 @@ namespace Dot4
 
 /-- Key-value attribute syntax for DOT properties -/
 declare_syntax_cat dotKV
-/-- Attribute assignment: key=value -/
+/-- Attribute assignment: {lit}`key=str` -/
 syntax ident "=" str : dotKV
+/-- Attribute assignment: {lit}`key=ident` -/
+syntax ident "=" ident : dotKV
+/-- Attribute assignment: {lit}`key=num` -/
+syntax ident "=" num : dotKV
 
 /-- Port and compass point syntax for edge endpoints -/
 declare_syntax_cat dotPort
@@ -44,10 +48,15 @@ syntax "node" str dotKV* : dotElem
 /-- Node declaration with unquoted identifier and attributes -/
 syntax "node" ident dotKV* : dotElem
 
-/-- Directed edge with Unicode arrow -/
-syntax "edge" dotNodeRef "→" dotNodeRef dotKV* : dotElem
-/-- Directed edge with ASCII arrow -/
-syntax "edge" dotNodeRef "->" dotNodeRef dotKV* : dotElem
+/-- Arrow with target node for edge chains -/
+declare_syntax_cat arrowNode
+/-- Unicode arrow with target -/
+syntax "→" dotNodeRef : arrowNode
+/-- ASCII arrow with target -/
+syntax "->" dotNodeRef : arrowNode
+
+/-- Directed edge (single or chain) with Unicode/ASCII arrows -/
+syntax "edge" dotNodeRef arrowNode+ dotKV* : dotElem
 
 /-- Bidirectional edge with Unicode arrows -/
 syntax "edge" dotNodeRef "↔" dotNodeRef dotKV* : dotElem
@@ -90,10 +99,8 @@ declare_syntax_cat subgraphElem
 syntax "node" str dotKV* : subgraphElem
 /-- Node declaration with unquoted ID inside subgraph -/
 syntax "node" ident dotKV* : subgraphElem
-/-- Directed edge with Unicode arrow inside subgraph -/
-syntax "edge" dotNodeRef "→" dotNodeRef dotKV* : subgraphElem
-/-- Directed edge with ASCII arrow inside subgraph -/
-syntax "edge" dotNodeRef "->" dotNodeRef dotKV* : subgraphElem
+/-- Directed edge (single or chain) inside subgraph -/
+syntax "edge" dotNodeRef arrowNode+ dotKV* : subgraphElem
 /-- Node defaults inside subgraph -/
 syntax "node_defaults" dotKV+ : subgraphElem
 /-- Edge defaults inside subgraph -/
@@ -130,6 +137,16 @@ def parseKVs (kvs : Lean.TSyntaxArray `dotKV) : Lean.MacroM (Lean.TSyntax `term)
       -- Validate the attribute at macro expansion time
       Dot4.validateAttrM keyStr valStr
       `(Dot4.Attr.mk $(Lean.quote keyStr) $val)
+    | `(dotKV| $key:ident = $val:ident) =>
+      let keyStr := toString key.getId
+      let valStr := toString val.getId
+      Dot4.validateAttrM keyStr valStr
+      `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr))
+    | `(dotKV| $key:ident = $val:num) =>
+      let keyStr := toString key.getId
+      let valStr := toString val.getNat
+      Dot4.validateAttrM keyStr valStr
+      `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr))
     | _ => Lean.Macro.throwUnsupported
   `([ $[$attrs],* ])
 
@@ -160,6 +177,21 @@ def parseEdgeKVs (kvs : Lean.TSyntaxArray `dotKV) : Lean.MacroM EdgeAttrResult :
         ltailVal := some (← `(some $val))
       else
         regularAttrs := regularAttrs.push (← `(Dot4.Attr.mk $(Lean.quote keyStr) $val))
+    | `(dotKV| $key:ident = $val:ident) =>
+      let keyStr := toString key.getId
+      let valStr := toString val.getId
+      Dot4.validateAttrM keyStr valStr
+      if keyStr == "lhead" then
+        lheadVal := some (← `(some $(Lean.quote valStr)))
+      else if keyStr == "ltail" then
+        ltailVal := some (← `(some $(Lean.quote valStr)))
+      else
+        regularAttrs := regularAttrs.push (← `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr)))
+    | `(dotKV| $key:ident = $val:num) =>
+      let keyStr := toString key.getId
+      let valStr := toString val.getNat
+      Dot4.validateAttrM keyStr valStr
+      regularAttrs := regularAttrs.push (← `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr)))
     | _ => Lean.Macro.throwUnsupported
 
   let attrList ← `([ $[$regularAttrs],* ])
@@ -192,6 +224,13 @@ def parsePort (p : Lean.TSyntax `dotPort) : Lean.MacroM (Lean.TSyntax `term) := 
     else
       `(Port.fromName $(Lean.quote name))
   | _ => `(Port.mk none none)
+
+/-- Parse arrow node to get the target node ref -/
+def parseArrowNode (an : Lean.TSyntax `arrowNode) : Lean.MacroM (Lean.TSyntax `dotNodeRef) := do
+  match an with
+  | `(arrowNode| → $ref:dotNodeRef) => pure ref
+  | `(arrowNode| -> $ref:dotNodeRef) => pure ref
+  | _ => Lean.Macro.throwUnsupported
 
 /-- Parse node reference to get (id, port) -/
 def parseNodeRef (ref : Lean.TSyntax `dotNodeRef) : Lean.MacroM (Lean.TSyntax `term × Lean.TSyntax `term) := do
@@ -256,20 +295,23 @@ def parseSubgraphElems (elems : Lean.TSyntaxArray `subgraphElem) (sgExpr : Lean.
         let idStr := Lean.quote (toString id.getId)
         let attrList ← parseKVs kvs
         `(Subgraph.addNode $result { id := $idStr, attrs := $attrList })
-      | `(subgraphElem| edge $src:dotNodeRef → $dst:dotNodeRef $kvs:dotKV*) => do
-        let (srcId, srcPort) ← parseNodeRef src
-        let (dstId, dstPort) ← parseNodeRef dst
+      | `(subgraphElem| edge $src:dotNodeRef $arrowNodes:arrowNode* $kvs:dotKV*) => do
         let edgeAttrs ← parseEdgeKVs kvs
         let lheadExpr := edgeAttrs.lhead.getD (← `(none))
         let ltailExpr := edgeAttrs.ltail.getD (← `(none))
-        `(Subgraph.addEdge $result { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $(edgeAttrs.attrs), lhead := $lheadExpr, ltail := $ltailExpr })
-      | `(subgraphElem| edge $src:dotNodeRef -> $dst:dotNodeRef $kvs:dotKV*) => do
-        let (srcId, srcPort) ← parseNodeRef src
-        let (dstId, dstPort) ← parseNodeRef dst
-        let edgeAttrs ← parseEdgeKVs kvs
-        let lheadExpr := edgeAttrs.lhead.getD (← `(none))
-        let ltailExpr := edgeAttrs.ltail.getD (← `(none))
-        `(Subgraph.addEdge $result { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $(edgeAttrs.attrs), lhead := $lheadExpr, ltail := $ltailExpr })
+        -- Collect all nodes
+        let mut allNodes : Array (Lean.TSyntax `term × Lean.TSyntax `term) := #[]
+        allNodes := allNodes.push (← parseNodeRef src)
+        for an in arrowNodes do
+          let targetRef ← parseArrowNode an
+          allNodes := allNodes.push (← parseNodeRef targetRef)
+        -- Create edges for consecutive pairs
+        let mut sgResult := result
+        for i in [0:allNodes.size - 1] do
+          let (srcId, srcPort) := allNodes[i]!
+          let (dstId, dstPort) := allNodes[i + 1]!
+          sgResult ← `(Subgraph.addEdge $sgResult { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $(edgeAttrs.attrs), lhead := $lheadExpr, ltail := $ltailExpr })
+        pure sgResult
       | `(subgraphElem| node_defaults $kvs:dotKV*) => do
         let attrList ← parseKVs kvs
         `(Subgraph.withNodeDefaults $result $attrList)
@@ -322,20 +364,24 @@ macro_rules
           let idStr := Lean.quote (toString id.getId)
           let attrList ← parseKVs kvs
           `(Graph.addNode $graphExpr { id := $idStr, attrs := $attrList })
-        | `(dotElem| edge $src:dotNodeRef → $dst:dotNodeRef $kvs:dotKV*) => do
-          let (srcId, srcPort) ← parseNodeRef src
-          let (dstId, dstPort) ← parseNodeRef dst
+        -- Edge chains: edge "A" -> "B" -> "C" creates A→B, B→C
+        | `(dotElem| edge $src:dotNodeRef $arrowNodes:arrowNode* $kvs:dotKV*) => do
           let edgeAttrs ← parseEdgeKVs kvs
           let lheadExpr := edgeAttrs.lhead.getD (← `(none))
           let ltailExpr := edgeAttrs.ltail.getD (← `(none))
-          `(Graph.addEdge $graphExpr { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $(edgeAttrs.attrs), lhead := $lheadExpr, ltail := $ltailExpr })
-        | `(dotElem| edge $src:dotNodeRef -> $dst:dotNodeRef $kvs:dotKV*) => do
-          let (srcId, srcPort) ← parseNodeRef src
-          let (dstId, dstPort) ← parseNodeRef dst
-          let edgeAttrs ← parseEdgeKVs kvs
-          let lheadExpr := edgeAttrs.lhead.getD (← `(none))
-          let ltailExpr := edgeAttrs.ltail.getD (← `(none))
-          `(Graph.addEdge $graphExpr { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $(edgeAttrs.attrs), lhead := $lheadExpr, ltail := $ltailExpr })
+          -- Collect all nodes: src followed by targets from arrow nodes
+          let mut allNodes : Array (Lean.TSyntax `term × Lean.TSyntax `term) := #[]
+          allNodes := allNodes.push (← parseNodeRef src)
+          for an in arrowNodes do
+            let targetRef ← parseArrowNode an
+            allNodes := allNodes.push (← parseNodeRef targetRef)
+          -- Create edges for consecutive pairs
+          let mut result := graphExpr
+          for i in [0:allNodes.size - 1] do
+            let (srcId, srcPort) := allNodes[i]!
+            let (dstId, dstPort) := allNodes[i + 1]!
+            result ← `(Graph.addEdge $result { src := $srcId, dst := $dstId, srcPort := $srcPort, dstPort := $dstPort, attrs := $(edgeAttrs.attrs), lhead := $lheadExpr, ltail := $ltailExpr })
+          pure result
         -- Bidirectional edges (creates two edges in opposite directions)
         | `(dotElem| edge $src:dotNodeRef ↔ $dst:dotNodeRef $kvs:dotKV*) => do
           let (srcId, srcPort) ← parseNodeRef src
