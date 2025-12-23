@@ -6,7 +6,7 @@ import Dot4
 Open this file in VS Code with the Lean extension to see graphs rendered
 as SVG in the infoview panel.
 
-Use `#dot myGraph` to render any Graph.
+Use {syntax command}`#dot myGraph` to render any Graph.
 -/
 
 open Dot4
@@ -124,3 +124,62 @@ def dagGraph := dot {
 
 -- Click "Animate" to see topological traversal: A → B → C → D → E
 #dot_topo dagGraph
+
+/-! ## Unquoted Identifiers
+
+Node names, graph names, and cluster names can be unquoted identifiers:
+-/
+
+/-- Graph using unquoted identifiers for names. -/
+def identGraph := dot {
+  digraph MyGraph
+  rankdir "LR"
+
+  node start label="Start"
+  node middle label="Middle"
+  node finish label="End"
+
+  edge start → middle
+  edge middle → finish
+}
+
+#dot identGraph
+
+/-! ## Interpolation Demo
+
+Use {lit}`$(expr)` syntax to interpolate Lean expressions into graph definitions.
+-/
+
+/-- Dynamic node labels and graph names using interpolation. -/
+def version := "v2.0"
+def serverName := "Production"
+def _nodeColor := "#4CAF50"
+
+def interpolatedGraph := dot {
+  digraph $(s!"System_{version}")
+  rankdir "LR"
+
+  node "server" label=$(serverName) fillcolor=$(nodeColor) style="filled"
+  node "client" label="Client"
+
+  edge "client" → "server"
+}
+
+#dot interpolatedGraph
+
+/-- Programmatic node generation with interpolation. -/
+def makeNode (name : String) (idx : Nat) : String := s!"{name}_{idx}"
+
+def dynamicGraph := dot {
+  digraph "Dynamic"
+  rankdir "LR"
+
+  node $(makeNode "task" 1) label="Task 1"
+  node $(makeNode "task" 2) label="Task 2"
+  node $(makeNode "task" 3) label="Task 3"
+
+  edge $(makeNode "task" 1) → $(makeNode "task" 2)
+  edge $(makeNode "task" 2) → $(makeNode "task" 3)
+}
+
+#dot dynamicGraph
