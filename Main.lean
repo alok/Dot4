@@ -320,3 +320,8 @@ def main : IO Unit := do
 
   IO.println "━━━ Example 11: Full Architecture ━━━"
   IO.println fullArchitecture.toDot
+
+structure EvenLenVecThat'sSquareFreeLength (n : Nat) (vec : Array Nat ) : Prop where
+  (h_even : n % 2 = 0)
+  (h_square_free : ∀ i, i < n → vec[i]! % 2 = 0)
+  (h_length : vec.size = n)

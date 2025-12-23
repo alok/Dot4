@@ -2,18 +2,21 @@ import Dot4.Basic
 import Dot4.Render
 import Lean
 import ProofWidgets.Component.Basic
+import ProofWidgets.Data.Html
+import ProofWidgets.Presentation.Expr
 
 /-!
 # Dot4 Interactive Widget
 
 Provides interactive graph visualization in the VS Code infoview using viz.js.
-Use `#dot myGraph` to render a graph in the infoview panel.
+- Use `#dot myGraph` to render a graph in the infoview panel
+- Click on any `Graph` expression to see it visualized in the infoview
 -/
 
 namespace Dot4
 
 open Lean Widget Server Elab Command Meta Term
-open ProofWidgets
+open ProofWidgets Jsx
 
 /-- Props for the Dot4 visualization widget -/
 structure DotWidgetProps where
@@ -69,5 +72,43 @@ def elabShowDotRawCmd : CommandElab := fun
       (return json% { dot: $(dotStr) })
       stx
   | stx => throwError "Unexpected syntax {stx}."
+
+/-! ## Expression Presenter for Graph type -/
+
+/-- Evaluate a Graph expression to get its DOT string representation -/
+unsafe def evalGraphExpr (e : Expr) : MetaM (Option String) := do
+  -- Check if expression has type Graph
+  let ty ← inferType e
+  let graphConst := Lean.mkConst ``Graph
+  if !(← isDefEq ty graphConst) then
+    return none
+  -- Build Graph.toDot application
+  let toDotExpr ← mkAppM ``Graph.toDot #[e]
+  -- Reduce and evaluate
+  let reduced ← whnf toDotExpr
+  try
+    let result ← evalExpr String (Lean.mkConst ``String) reduced
+    return some result
+  catch _ =>
+    return none
+
+/-- Safe wrapper for graph evaluation -/
+@[implemented_by evalGraphExpr]
+opaque evalGraphExprSafe : Expr → MetaM (Option String)
+
+/-- Expression presenter that visualizes Graph expressions in the infoview.
+Click on any Graph expression to see its visualization. -/
+@[expr_presenter]
+def graphPresenter : ExprPresenter where
+  userName := "Graph Visualization"
+  layoutKind := .block
+  present e := do
+    -- Try to evaluate the graph
+    match ← evalGraphExprSafe e with
+    | some dotStr =>
+      -- Return HTML with embedded component
+      return Html.ofComponent DotVisualization { dot := dotStr } #[]
+    | none =>
+      throwError "Could not evaluate Graph expression"
 
 end Dot4
