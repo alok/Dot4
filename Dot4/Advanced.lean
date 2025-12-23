@@ -222,4 +222,190 @@ def htmlRow (cells : List HtmlCell) : HtmlRow := { cells }
 /-- Quick table constructor -/
 def htmlTable (rows : List HtmlRow) : HtmlTable := { rows }
 
+/-! ## Graph Diff -/
+
+/-- A node change in a graph diff -/
+inductive NodeChange where
+  /-- Node was added in the new graph -/
+  | added (n : Node)
+  /-- Node was removed from the old graph -/
+  | removed (n : Node)
+  /-- Node attributes changed -/
+  | modified (oldNode newNode : Node)
+  deriving Repr
+
+/-- An edge change in a graph diff -/
+inductive EdgeChange where
+  /-- Edge was added in the new graph -/
+  | added (e : Edge)
+  /-- Edge was removed from the old graph -/
+  | removed (e : Edge)
+  /-- Edge attributes changed -/
+  | modified (oldEdge newEdge : Edge)
+  deriving Repr
+
+/-- Represents the difference between two graphs -/
+structure GraphDiff where
+  /-- Node changes (added, removed, modified) -/
+  nodes : List NodeChange := []
+  /-- Edge changes (added, removed, modified) -/
+  edges : List EdgeChange := []
+  /-- Subgraph names added in new graph -/
+  subgraphsAdded : List String := []
+  /-- Subgraph names removed from old graph -/
+  subgraphsRemoved : List String := []
+  deriving Repr
+
+namespace GraphDiff
+
+/-- Check if graphs are identical -/
+def isEmpty (d : GraphDiff) : Bool :=
+  d.nodes.isEmpty && d.edges.isEmpty &&
+  d.subgraphsAdded.isEmpty && d.subgraphsRemoved.isEmpty
+
+/-- Get only added nodes -/
+def addedNodes (d : GraphDiff) : List Node :=
+  d.nodes.filterMap fun c => match c with
+    | .added n => some n
+    | _ => none
+
+/-- Get only removed nodes -/
+def removedNodes (d : GraphDiff) : List Node :=
+  d.nodes.filterMap fun c => match c with
+    | .removed n => some n
+    | _ => none
+
+/-- Get only modified nodes (old, new pairs) -/
+def modifiedNodes (d : GraphDiff) : List (Node × Node) :=
+  d.nodes.filterMap fun c => match c with
+    | .modified oldNode newNode => some (oldNode, newNode)
+    | _ => none
+
+/-- Get only added edges -/
+def addedEdges (d : GraphDiff) : List Edge :=
+  d.edges.filterMap fun c => match c with
+    | .added e => some e
+    | _ => none
+
+/-- Get only removed edges -/
+def removedEdges (d : GraphDiff) : List Edge :=
+  d.edges.filterMap fun c => match c with
+    | .removed e => some e
+    | _ => none
+
+/-- Summary of changes -/
+def summary (d : GraphDiff) : String :=
+  let added := d.addedNodes.length
+  let removed := d.removedNodes.length
+  let modified := d.modifiedNodes.length
+  let edgesAdded := d.addedEdges.length
+  let edgesRemoved := d.removedEdges.length
+  s!"+{added}/-{removed}/~{modified} nodes, +{edgesAdded}/-{edgesRemoved} edges"
+
+end GraphDiff
+
+namespace Graph
+
+/-- Compare attribute lists (order-independent) -/
+private def attrsEqual (a1 a2 : List Attr) : Bool :=
+  a1.length == a2.length &&
+  a1.all fun attr => a2.any fun attr' => attr.key == attr'.key && attr.value == attr'.value
+
+/-- Compare two nodes for equality (including attributes) -/
+private def nodeEqual (n1 n2 : Node) : Bool :=
+  n1.id == n2.id && n1.label == n2.label && attrsEqual n1.attrs n2.attrs
+
+/-- Compare two edges for equality (including attributes) -/
+private def edgeEqual (e1 e2 : Edge) : Bool :=
+  e1.src == e2.src && e1.dst == e2.dst &&
+  e1.srcPort == e2.srcPort && e1.dstPort == e2.dstPort &&
+  e1.label == e2.label && attrsEqual e1.attrs e2.attrs
+
+/-- Compute the diff between two graphs.
+    Returns changes needed to transform the first graph into the second. -/
+def diff (old new : Graph) : GraphDiff :=
+  -- Collect all nodes from both graphs (including subgraphs)
+  let oldNodes := old.nodes ++ old.subgraphs.flatMap (·.nodes)
+  let newNodes := new.nodes ++ new.subgraphs.flatMap (·.nodes)
+
+  -- Collect all edges from both graphs
+  let oldEdges := old.edges ++ old.subgraphs.flatMap (·.edges)
+  let newEdges := new.edges ++ new.subgraphs.flatMap (·.edges)
+
+  -- Compute node changes
+  let nodeChanges := Id.run do
+    let mut changes : List NodeChange := []
+
+    -- Find removed and modified nodes
+    for oNode in oldNodes do
+      match newNodes.find? (·.id == oNode.id) with
+      | none => changes := .removed oNode :: changes
+      | some nNode =>
+        if !nodeEqual oNode nNode then
+          changes := .modified oNode nNode :: changes
+
+    -- Find added nodes
+    for nNode in newNodes do
+      if !oldNodes.any (·.id == nNode.id) then
+        changes := .added nNode :: changes
+
+    changes.reverse
+
+  -- Compute edge changes
+  let edgeChanges := Id.run do
+    let mut changes : List EdgeChange := []
+
+    -- Find removed and modified edges
+    for oEdge in oldEdges do
+      match newEdges.find? (fun e => e.src == oEdge.src && e.dst == oEdge.dst) with
+      | none => changes := .removed oEdge :: changes
+      | some nEdge =>
+        if !edgeEqual oEdge nEdge then
+          changes := .modified oEdge nEdge :: changes
+
+    -- Find added edges
+    for nEdge in newEdges do
+      if !oldEdges.any (fun e => e.src == nEdge.src && e.dst == nEdge.dst) then
+        changes := .added nEdge :: changes
+
+    changes.reverse
+
+  -- Compute subgraph changes
+  let oldSubgraphNames := old.subgraphs.map (·.name)
+  let newSubgraphNames := new.subgraphs.map (·.name)
+  let subgraphsAdded := newSubgraphNames.filter (!oldSubgraphNames.contains ·)
+  let subgraphsRemoved := oldSubgraphNames.filter (!newSubgraphNames.contains ·)
+
+  { nodes := nodeChanges
+    edges := edgeChanges
+    subgraphsAdded
+    subgraphsRemoved }
+
+/-- Check if two graphs are structurally equal (ignoring order) -/
+def structuralEq (g1 g2 : Graph) : Bool :=
+  (diff g1 g2).isEmpty
+
+/-- Apply a diff to a graph to produce a new graph -/
+def applyDiff (g : Graph) (d : GraphDiff) : Graph :=
+  let g := d.nodes.foldl (fun gr change =>
+    match change with
+    | .added n => gr.addNode n
+    | .removed n => { gr with nodes := gr.nodes.filter (·.id != n.id) }
+    | .modified _ newNode => { gr with nodes := gr.nodes.map fun n =>
+        if n.id == newNode.id then newNode else n }
+  ) g
+
+  let g := d.edges.foldl (fun gr change =>
+    match change with
+    | .added e => gr.addEdge e
+    | .removed e => { gr with edges := gr.edges.filter fun e' =>
+        e'.src != e.src || e'.dst != e.dst }
+    | .modified _ newEdge => { gr with edges := gr.edges.map fun e =>
+        if e.src == newEdge.src && e.dst == newEdge.dst then newEdge else e }
+  ) g
+
+  g
+
+end Graph
+
 end Dot4
