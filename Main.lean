@@ -99,9 +99,9 @@ def recordNodes : Graph := dot {
 /-- Example 5: Compass points for precise edge routing -/
 def compassEdges : Graph := dot {
   digraph "Compass"
-  node_defaults shape="box" width="1.5" height="1.0"
+  node_defaults shape="box" width="1.5" height=1.3
 
-  node "center" label="Center"
+  node "center" label=Center
   node "north" label="North"
   node "east" label="East"
   node "south" label="South"

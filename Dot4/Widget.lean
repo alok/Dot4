@@ -53,9 +53,10 @@ unsafe def elabShowDotCmd : CommandElab := fun
     -- Elaborate the graph and extract DOT string
     let dotStr ← liftTermElabM <| evalGraphToDot g
     -- Save the widget with the DOT string as props
+    let props : DotWidgetProps := { dot := dotStr }
     liftCoreM <| Widget.savePanelWidgetInfo
       (hash DotVisualization.javascript)
-      (return json% { dot: $(dotStr) })
+      (return ← Server.rpcEncode props)
       stx
   | stx => throwError "Unexpected syntax {stx}."
 
@@ -67,9 +68,10 @@ syntax (name := showDotRawCmd) "#dot_raw " str : command
 def elabShowDotRawCmd : CommandElab := fun
   | stx@`(#dot_raw $s:str) => do
     let dotStr := s.getString
+    let props : DotWidgetProps := { dot := dotStr }
     liftCoreM <| Widget.savePanelWidgetInfo
       (hash DotVisualization.javascript)
-      (return json% { dot: $(dotStr) })
+      (return ← Server.rpcEncode props)
       stx
   | stx => throwError "Unexpected syntax {stx}."
 
