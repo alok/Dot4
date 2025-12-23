@@ -113,6 +113,52 @@ def myGraph := dot {
 - `Graph.addChain`: Create edge chains programmatically
 - `starGraph`, `linearGraph`, `completeGraph`: Common patterns
 
+### Graph Diff
+Compare two graphs and detect changes:
+```lean
+let d := Graph.diff oldGraph newGraph
+-- d.addedNodes, d.removedNodes, d.modifiedNodes
+-- d.addedEdges, d.removedEdges
+-- d.summary returns "+2/-1/~0 nodes, +3/-2 edges"
+```
+
+### Graph Algorithms
+- **Traversal**: `dfs`, `bfsWithLevels`, `reachable`
+- **Paths**: `shortestPath`, `allPaths`, `hasPath`
+- **Cycles**: `isDAG`, `findCycle`, `findAllCycles`
+- **Components**: `connectedComponents`, `stronglyConnectedComponents`
+- **Structure**: `topologicalSort`, `articulationPoints`, `bridges`
+- **Metrics**: `clusteringCoefficient`, `diameter`
+
+### Graph Templates
+Pre-configured templates for common diagram types:
+```lean
+-- Flowchart with decisions
+let flow := flowchart "Login"
+  |>.addProcess "input" "Enter credentials"
+  |>.addDecision "valid" "Valid?"
+  |>.addTransition "valid" "success" "Yes"
+
+-- State machine
+let fsm := stateMachine "Traffic"
+  |>.addState "red" "Red" (entry := some "stop()")
+  |>.addTransition "red" "green" "timer"
+
+-- UML class diagram
+let uml := classDiagram "Animals"
+  |>.addClass "dog" "Dog" ["breed: String"] ["bark()"]
+  |>.addInheritance "dog" "animal"
+```
+
+### File I/O
+```lean
+-- Write to file
+myGraph.writeDotFile "output.dot"
+
+-- Render with Graphviz
+myGraph.renderToFile "output.png" (format := "png") (engine := "dot")
+```
+
 ### Advanced
 - **HTML Labels**: Rich table-based node labels
 - **Compass Points**: `:n`, `:ne`, `:e`, `:se`, `:s`, `:sw`, `:w`, `:nw`
