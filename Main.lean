@@ -284,6 +284,24 @@ def fullArchitecture : Graph := dot {
   edge "products" → "s3"
 }
 
+/-! ## Unquoted Values Example -/
+
+/-- Example 12: Unquoted attribute values including floats -/
+def unquotedDemo : Graph := dot {
+  digraph "UnquotedDemo"
+  rankdir "LR"  -- graph-level attrs still use strings
+
+  -- Node/edge attrs support unquoted values and floats
+  node_defaults shape=box fontsize=14 penwidth=1.5
+  edge_defaults arrowsize=0.8
+
+  node "A" width=2.0 height=1.5 label="Node A" fixedsize=true
+  node "B" width=1.0 height=0.5 label="Node B"
+  node "C" shape=circle
+
+  edge "A" -> "B" -> "C" penwidth=2.5
+}
+
 /-! ## Main Entry Point -/
 
 /-- CLI entry point displaying demo graphs -/
@@ -320,3 +338,7 @@ def main : IO Unit := do
 
   IO.println "━━━ Example 11: Full Architecture ━━━"
   IO.println fullArchitecture.toDot
+  IO.println ""
+
+  IO.println "━━━ Example 12: Unquoted Floats ━━━"
+  IO.println unquotedDemo.toDot

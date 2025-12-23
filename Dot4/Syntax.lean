@@ -151,7 +151,8 @@ def parseKVs (kvs : Lean.TSyntaxArray `dotKV) : Lean.MacroM (Lean.TSyntax `term)
       `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr))
     | `(dotKV| $key:ident = $val:scientific) =>
       let keyStr := toString key.getId
-      let valStr := val.raw.getAtomVal
+      -- Scientific literals store the value in the first argument
+      let valStr := val.raw.getArgs[0]!.getAtomVal
       Dot4.validateAttrM keyStr valStr (some val.raw)
       `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr))
     | _ => Lean.Macro.throwUnsupported
@@ -201,7 +202,8 @@ def parseEdgeKVs (kvs : Lean.TSyntaxArray `dotKV) : Lean.MacroM EdgeAttrResult :
       regularAttrs := regularAttrs.push (← `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr)))
     | `(dotKV| $key:ident = $val:scientific) =>
       let keyStr := toString key.getId
-      let valStr := val.raw.getAtomVal
+      -- Scientific literals store the value in the first argument
+      let valStr := val.raw.getArgs[0]!.getAtomVal
       Dot4.validateAttrM keyStr valStr (some val.raw)
       regularAttrs := regularAttrs.push (← `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr)))
     | _ => Lean.Macro.throwUnsupported
