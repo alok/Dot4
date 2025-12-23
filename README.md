@@ -56,6 +56,18 @@ Also works with raw DOT strings:
 #dot_raw "digraph { rankdir=LR; a -> b -> c }"
 ```
 
+### Interactive Widget Features
+
+- **Layout Engine Selector**: Switch between 8 Graphviz engines (dot, neato, fdp, sfdp, circo, twopi, osage, patchwork) directly in the UI
+- **Dark Mode**: Auto-detects VS Code theme and adapts colors
+- **Click to Inspect**: Click nodes/edges to see details (id, label, shape)
+- **Graph Diff**: Compare two graphs with visual highlighting
+
+```lean
+-- Compare graphs: green = added, red dashed = removed
+#dot_diff oldGraph newGraph
+```
+
 ## Features
 
 ### DSL Syntax
@@ -271,3 +283,4 @@ Issues and PRs welcome! The codebase is structured as:
 - `Dot4/Colors.lean` - Type-safe colors
 - `Dot4/Shapes.lean` - Type-safe shapes and enums
 - `Dot4/Advanced.lean` - Graph operations and utilities
+- `Dot4/Widget.lean` - VS Code infoview widget (`#dot`, `#dot_raw`, `#dot_diff`)
