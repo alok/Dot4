@@ -153,16 +153,16 @@ Use {lit}`$(expr)` syntax to interpolate Lean expressions into graph definitions
 /-- Dynamic node labels and graph names using interpolation. -/
 def version := "v2.0"
 def serverName := "Production"
-def _nodeColor := "#4CAF50"
+def nodeColor := "#4CAF50"
 
 def interpolatedGraph := dot {
   digraph $(s!"System_{version}")
   rankdir "LR"
 
-  node "server" label=$(serverName) fillcolor=$(nodeColor) style="filled"
-  node "client" label="Client"
+  node "server" label=$(serverName) fillcolor=$nodeColor style="filled"
+  node client label=Client
 
-  edge "client" → "server"
+  edge client → server
 }
 
 #dot interpolatedGraph
@@ -183,3 +183,38 @@ def dynamicGraph := dot {
 }
 
 #dot dynamicGraph
+
+/-! ## Programmatic Diff API
+
+Use `Graph.diff` to compute structural differences between graphs.
+-/
+
+-- Demonstrate programmatic diff
+#eval do
+  let d := Graph.diff oldGraph newGraph
+  IO.println s!"Diff summary: {d.summary}"
+  IO.println s!"Added nodes: {d.addedNodes.map (·.id)}"
+  IO.println s!"Removed nodes: {d.removedNodes.map (·.id)}"
+  IO.println s!"Added edges: {d.addedEdges.map fun e => s!"{e.src}->{e.dst}"}"
+  IO.println s!"Removed edges: {d.removedEdges.map fun e => s!"{e.src}->{e.dst}"}"
+
+-- Check structural equality
+#eval IO.println s!"oldGraph == newGraph: {Graph.structuralEq oldGraph newGraph}"
+#eval IO.println s!"oldGraph == oldGraph: {Graph.structuralEq oldGraph oldGraph}"
+
+/-! ## Graph Algorithms
+
+Comprehensive graph analysis algorithms.
+-/
+
+-- Graph properties
+#eval IO.println s!"DAG is a DAG: {dagGraph.isDAG}"
+#eval IO.println s!"DAG topo sort: {dagGraph.topologicalSort}"
+#eval IO.println s!"Reachable from A: {dagGraph.reachable "A"}"
+#eval IO.println s!"Shortest A→E: {dagGraph.shortestPath "A" "E"}"
+#eval IO.println s!"All paths A→E: {dagGraph.allPaths "A" "E"}"
+#eval IO.println s!"BFS levels from A: {dagGraph.bfsWithLevels "A"}"
+#eval IO.println s!"Connected components: {dagGraph.connectedComponents}"
+#eval IO.println s!"Is connected: {dagGraph.isConnected}"
+#eval IO.println s!"Roots: {dagGraph.roots}"
+#eval IO.println s!"Leaves: {dagGraph.leaves}"
