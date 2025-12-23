@@ -222,6 +222,32 @@ def htmlRow (cells : List HtmlCell) : HtmlRow := { cells }
 /-- Quick table constructor -/
 def htmlTable (rows : List HtmlRow) : HtmlTable := { rows }
 
+/-! ## DOT File I/O -/
+
+/-- Write a graph to a DOT file -/
+def Graph.writeDotFile (g : Graph) (path : System.FilePath) : IO Unit := do
+  IO.FS.writeFile path g.toDot
+
+/-- Read DOT content from a file (returns raw string, use Parser.fromDot to parse) -/
+def readDotFile (path : System.FilePath) : IO String := do
+  IO.FS.readFile path
+
+/-- Write a graph to a DOT file and render with Graphviz -/
+def Graph.renderToFile (g : Graph) (outputPath : System.FilePath)
+    (format : String := "png") (engine : String := "dot") : IO Unit := do
+  let tempPath := System.FilePath.mk s!"/tmp/dot4_{g.name.hash}.dot"
+  g.writeDotFile tempPath
+  let _ ← IO.Process.run {
+    cmd := engine
+    args := #[s!"-T{format}", "-o", outputPath.toString, tempPath.toString]
+  }
+
+/-- Available Graphviz layout engines -/
+def layoutEngines : List String := ["dot", "neato", "fdp", "sfdp", "circo", "twopi", "osage", "patchwork"]
+
+/-- Available output formats -/
+def outputFormats : List String := ["png", "svg", "pdf", "jpg", "gif", "ps", "eps", "json"]
+
 /-! ## Graph Templates -/
 
 /-- Create a flowchart with decision nodes and process nodes -/
