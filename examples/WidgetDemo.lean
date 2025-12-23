@@ -68,3 +68,33 @@ def fanoutGraph := dot {
 }
 
 #dot fanoutGraph
+
+/-! ## Graph Diff Demo
+
+Compare two graphs - added nodes/edges shown in green, removed in red dashed.
+-/
+
+/-- Old version of a graph. -/
+def oldGraph := dot {
+  digraph "Old"
+  rankdir "LR"
+  node "A" label="Start"
+  node "B" label="Middle"
+  node "C" label="End"
+  edge "A" → "B"
+  edge "B" → "C"
+}
+
+/-- New version with modifications. -/
+def newGraph := dot {
+  digraph "New"
+  rankdir "LR"
+  node "A" label="Start"
+  node "B" label="Middle"
+  node "D" label="New Node"
+  edge "A" → "B"
+  edge "B" → "D"
+}
+
+-- Shows diff: C and B→C removed (red dashed), D and B→D added (green)
+#dot_diff oldGraph newGraph
