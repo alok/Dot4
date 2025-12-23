@@ -392,6 +392,114 @@ def leaves (g : Graph) : List String :=
 def roots (g : Graph) : List String :=
   g.getNodeIds.filter (fun n => g.inDegree n == 0)
 
+/-- Find one cycle in the graph (if any). Returns the cycle path. -/
+partial def findCycle (g : Graph) : Option (List String) :=
+  let allNodes := g.getNodeIds
+  let rec dfs (curr : String) (path : List String) (visited : List String)
+             : Option (List String) × List String :=
+    if path.contains curr then
+      -- Found cycle - extract it
+      let cycleStart := path.reverse.dropWhile (· != curr)
+      (some (curr :: cycleStart), visited)
+    else if visited.contains curr then
+      (none, visited)
+    else
+      let newPath := curr :: path
+      let newVisited := curr :: visited
+      let succs := g.successors curr
+      succs.foldl
+        (fun (acc : Option (List String) × List String) succ =>
+          match acc.1 with
+          | some _ => acc  -- Already found cycle
+          | none => dfs succ newPath acc.2)
+        (none, newVisited)
+  allNodes.foldl
+    (fun (acc : Option (List String)) n =>
+      match acc with
+      | some _ => acc
+      | none => (dfs n [] []).1)
+    none
+
+/-- Find all cycles in the graph -/
+partial def findAllCycles (g : Graph) : List (List String) :=
+  let allNodes := g.getNodeIds
+  -- Use Johnson's algorithm simplified
+  let rec findCyclesFrom (start : String) (curr : String) (path : List String)
+                         (blocked : List String) : List (List String) :=
+    if curr == start && path.length > 0 then
+      [path.reverse ++ [start]]
+    else if blocked.contains curr || path.contains curr then
+      []
+    else
+      let newPath := curr :: path
+      (g.successors curr).flatMap fun succ =>
+        findCyclesFrom start succ newPath blocked
+  -- Find cycles starting from each node
+  allNodes.flatMap fun start =>
+    let cycles := findCyclesFrom start start [] []
+    -- Filter to only keep unique cycles (avoid duplicates from different start points)
+    cycles.filter fun cycle =>
+      cycle.head? == some start
+
+/-- Extract a subgraph containing only the specified nodes -/
+def subgraphOf (g : Graph) (nodeIds : List String) : Graph :=
+  let nodes := g.nodes.filter (fun n => nodeIds.contains n.id)
+  let edges := g.edges.filter (fun e => nodeIds.contains e.src && nodeIds.contains e.dst)
+  { g with nodes, edges, subgraphs := [] }
+
+/-- Extract neighborhood of a node (nodes within k hops) -/
+partial def neighborhood (g : Graph) (center : String) (k : Nat := 1) : Graph :=
+  let rec expand (frontier : List String) (collected : List String) (depth : Nat)
+                : List String :=
+    if depth >= k then collected
+    else
+      let newNodes := frontier.flatMap fun n =>
+        (g.successors n ++ g.predecessors n).filter (fun x => !collected.contains x)
+      let unique := newNodes.foldl (fun acc n =>
+        if acc.contains n then acc else n :: acc) []
+      expand unique (collected ++ unique) (depth + 1)
+  let nodeIds := center :: expand [center] [center] 0
+  g.subgraphOf nodeIds
+
+/-- Compute clustering coefficient for a node -/
+def clusteringCoefficient (g : Graph) (nodeId : String) : Float :=
+  let neighbors := g.successors nodeId ++ g.predecessors nodeId
+  let uniqueNeighbors := neighbors.foldl (fun acc n =>
+    if acc.contains n then acc else n :: acc) []
+  let k := uniqueNeighbors.length
+  if k < 2 then 0.0
+  else
+    -- Count edges between neighbors
+    let edgeCount := uniqueNeighbors.foldl (fun acc n1 =>
+      acc + (uniqueNeighbors.filter (fun n2 =>
+        n1 != n2 && (g.hasEdge n1 n2 || g.hasEdge n2 n1))).length) 0
+    let possibleEdges := k * (k - 1)
+    Float.ofNat edgeCount / Float.ofNat possibleEdges
+
+/-- Compute average clustering coefficient -/
+def avgClusteringCoefficient (g : Graph) : Float :=
+  let nodes := g.getNodeIds
+  if nodes.isEmpty then 0.0
+  else
+    let total := nodes.foldl (fun acc n => acc + g.clusteringCoefficient n) 0.0
+    total / Float.ofNat nodes.length
+
+/-- Find articulation points (nodes whose removal disconnects the graph) -/
+partial def articulationPoints (g : Graph) : List String :=
+  let allNodes := g.getNodeIds
+  let baseComponents := g.connectedComponents.length
+  allNodes.filter fun n =>
+    let withoutN := g.subgraphOf (allNodes.filter (· != n))
+    withoutN.connectedComponents.length > baseComponents
+
+/-- Find bridges (edges whose removal disconnects the graph) -/
+partial def bridges (g : Graph) : List (String × String) :=
+  let baseComponents := g.connectedComponents.length
+  g.edgePairs.filter fun (src, dst) =>
+    let withoutEdge := { g with edges := g.edges.filter fun e =>
+      !(e.src == src && e.dst == dst) }
+    withoutEdge.connectedComponents.length > baseComponents
+
 end Graph
 
 end Dot4
