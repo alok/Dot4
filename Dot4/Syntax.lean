@@ -11,44 +11,48 @@ Supports nodes, edges, subgraphs, clusters, and graph attributes.
 
 namespace Dot4
 
+/-- Value syntax for DOT attribute values (supports antiquotation with $(expr)) -/
+declare_syntax_cat dotValue (behavior := symbol)
+/-- String value -/
+syntax str : dotValue
+/-- Identifier value -/
+syntax ident : dotValue
+/-- Numeric value -/
+syntax num : dotValue
+/-- Float value -/
+syntax scientific : dotValue
+
 /-- Key-value attribute syntax for DOT properties -/
 declare_syntax_cat dotKV
-/-- Attribute assignment: {lit}`key=str` -/
-syntax ident "=" str : dotKV
-/-- Attribute assignment: {lit}`key=ident` -/
-syntax ident "=" ident : dotKV
-/-- Attribute assignment: {lit}`key=num` -/
-syntax ident "=" num : dotKV
-/-- Attribute assignment: {lit}`key=float` for height, width, etc. -/
-syntax ident "=" scientific : dotKV
+/-- Attribute assignment: {lit}`key=value` where value can be str, ident, num, scientific, or $(expr) -/
+syntax ident "=" dotValue : dotKV
 
 /-- Port and compass point syntax for edge endpoints -/
 declare_syntax_cat dotPort
 /-- Port specification with colon prefix -/
 syntax ":" ident : dotPort
 
-/-- Node reference with optional port/compass specifications -/
-declare_syntax_cat dotNodeRef
-/-- Node reference with quoted string ID -/
-syntax str : dotNodeRef
+/-- Node ID syntax (supports antiquotation with $(expr)) -/
+declare_syntax_cat dotNodeId (behavior := symbol)
+/-- Node ID as quoted string -/
+syntax str : dotNodeId
+/-- Node ID as unquoted identifier -/
+syntax ident : dotNodeId
+
+/-- Node reference with optional port/compass specifications (supports antiquotation) -/
+declare_syntax_cat dotNodeRef (behavior := symbol)
+/-- Node reference -/
+syntax dotNodeId : dotNodeRef
 /-- Node reference with port -/
-syntax str dotPort : dotNodeRef
+syntax dotNodeId dotPort : dotNodeRef
 /-- Node reference with port and compass point -/
-syntax str dotPort dotPort : dotNodeRef
-/-- Node reference with unquoted identifier -/
-syntax ident : dotNodeRef
-/-- Node reference with unquoted identifier and port -/
-syntax ident dotPort : dotNodeRef
-/-- Node reference with unquoted identifier, port, and compass point -/
-syntax ident dotPort dotPort : dotNodeRef
+syntax dotNodeId dotPort dotPort : dotNodeRef
 
 /-- Graph element syntax for nodes, edges, subgraphs, and attributes -/
 declare_syntax_cat dotElem
 
-/-- Node declaration with quoted ID and attributes -/
-syntax "node" str dotKV* : dotElem
-/-- Node declaration with unquoted identifier and attributes -/
-syntax "node" ident dotKV* : dotElem
+/-- Node declaration with ID and attributes -/
+syntax "node" dotNodeId dotKV* : dotElem
 
 /-- Arrow with target node for edge chains -/
 declare_syntax_cat arrowNode
@@ -97,10 +101,8 @@ syntax "mrecord" str "[" recordField,* "]" dotKV* : dotElem
 
 /-- Subgraph element syntax for nodes, edges, and attributes within subgraphs -/
 declare_syntax_cat subgraphElem
-/-- Node declaration with quoted ID inside subgraph -/
-syntax "node" str dotKV* : subgraphElem
-/-- Node declaration with unquoted ID inside subgraph -/
-syntax "node" ident dotKV* : subgraphElem
+/-- Node declaration inside subgraph -/
+syntax "node" dotNodeId dotKV* : subgraphElem
 /-- Directed edge (single or chain) inside subgraph -/
 syntax "edge" dotNodeRef arrowNode+ dotKV* : subgraphElem
 /-- Node defaults inside subgraph -/
@@ -111,14 +113,14 @@ syntax "edge_defaults" dotKV+ : subgraphElem
 syntax ident str : subgraphElem
 
 /-- Cluster subgraph with visible boundary -/
-syntax "cluster" str "{" subgraphElem* "}" : dotElem
+syntax "cluster" dotNodeId "{" subgraphElem* "}" : dotElem
 /-- Plain subgraph without boundary -/
-syntax "subgraph" str "{" subgraphElem* "}" : dotElem
+syntax "subgraph" dotNodeId "{" subgraphElem* "}" : dotElem
 
 /-- Directed graph declaration -/
-syntax "digraph" str : dotElem
+syntax "digraph" dotNodeId : dotElem
 /-- Undirected graph declaration -/
-syntax "graph" str : dotElem
+syntax "graph" dotNodeId : dotElem
 /-- Strict directed graph (no multi-edges) -/
 syntax "strict" "digraph" str : dotElem
 /-- Strict undirected graph (no multi-edges) -/
@@ -129,32 +131,38 @@ syntax ident str : dotElem
 /-- Main DOT graph block syntax -/
 syntax "dot" "{" dotElem* "}" : term
 
+/-- Parse a dotValue to get the value expression and optional literal for validation -/
+def parseDotValue (v : Lean.TSyntax `dotValue) : Lean.MacroM (Lean.TSyntax `term × Option String) := do
+  if v.raw.isAntiquot then
+    -- Interpolated value: $(expr)
+    let term := ⟨v.raw.getAntiquotTerm⟩
+    pure (term, none)
+  else
+    match v with
+    | `(dotValue| $val:str) =>
+      pure (val, some val.getString)
+    | `(dotValue| $val:ident) =>
+      let valStr := toString val.getId
+      pure (← `($(Lean.quote valStr)), some valStr)
+    | `(dotValue| $val:num) =>
+      let valStr := toString val.getNat
+      pure (← `($(Lean.quote valStr)), some valStr)
+    | `(dotValue| $val:scientific) =>
+      let valStr := val.raw.getArgs[0]!.getAtomVal
+      pure (← `($(Lean.quote valStr)), some valStr)
+    | _ => Lean.Macro.throwUnsupported
+
 /-- Convert key-value pairs to attribute list with validation -/
 def parseKVs (kvs : Lean.TSyntaxArray `dotKV) : Lean.MacroM (Lean.TSyntax `term) := do
   let attrs ← kvs.mapM fun kv => do
     match kv with
-    | `(dotKV| $key:ident = $val:str) =>
+    | `(dotKV| $key:ident = $val:dotValue) =>
       let keyStr := toString key.getId
-      let valStr := val.getString
-      -- Validate the attribute, highlighting the value on error
-      Dot4.validateAttrM keyStr valStr (some val.raw)
-      `(Dot4.Attr.mk $(Lean.quote keyStr) $val)
-    | `(dotKV| $key:ident = $val:ident) =>
-      let keyStr := toString key.getId
-      let valStr := toString val.getId
-      Dot4.validateAttrM keyStr valStr (some val.raw)
-      `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr))
-    | `(dotKV| $key:ident = $val:num) =>
-      let keyStr := toString key.getId
-      let valStr := toString val.getNat
-      Dot4.validateAttrM keyStr valStr (some val.raw)
-      `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr))
-    | `(dotKV| $key:ident = $val:scientific) =>
-      let keyStr := toString key.getId
-      -- Scientific literals store the value in the first argument
-      let valStr := val.raw.getArgs[0]!.getAtomVal
-      Dot4.validateAttrM keyStr valStr (some val.raw)
-      `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr))
+      let (valExpr, valStrOpt) ← parseDotValue val
+      -- Validate the attribute if we have a literal value
+      if let some valStr := valStrOpt then
+        Dot4.validateAttrM keyStr valStr (some val.raw)
+      `(Dot4.Attr.mk $(Lean.quote keyStr) $valExpr)
     | _ => Lean.Macro.throwUnsupported
   `([ $[$attrs],* ])
 
@@ -175,37 +183,19 @@ def parseEdgeKVs (kvs : Lean.TSyntaxArray `dotKV) : Lean.MacroM EdgeAttrResult :
 
   for kv in kvs do
     match kv with
-    | `(dotKV| $key:ident = $val:str) =>
+    | `(dotKV| $key:ident = $val:dotValue) =>
       let keyStr := toString key.getId
-      let valStr := val.getString
-      Dot4.validateAttrM keyStr valStr (some val.raw)
+      let (valExpr, valStrOpt) ← parseDotValue val
+      -- Validate if literal
+      if let some valStr := valStrOpt then
+        Dot4.validateAttrM keyStr valStr (some val.raw)
+      -- Check for lhead/ltail
       if keyStr == "lhead" then
-        lheadVal := some (← `(some $val))
+        lheadVal := some (← `(some $valExpr))
       else if keyStr == "ltail" then
-        ltailVal := some (← `(some $val))
+        ltailVal := some (← `(some $valExpr))
       else
-        regularAttrs := regularAttrs.push (← `(Dot4.Attr.mk $(Lean.quote keyStr) $val))
-    | `(dotKV| $key:ident = $val:ident) =>
-      let keyStr := toString key.getId
-      let valStr := toString val.getId
-      Dot4.validateAttrM keyStr valStr (some val.raw)
-      if keyStr == "lhead" then
-        lheadVal := some (← `(some $(Lean.quote valStr)))
-      else if keyStr == "ltail" then
-        ltailVal := some (← `(some $(Lean.quote valStr)))
-      else
-        regularAttrs := regularAttrs.push (← `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr)))
-    | `(dotKV| $key:ident = $val:num) =>
-      let keyStr := toString key.getId
-      let valStr := toString val.getNat
-      Dot4.validateAttrM keyStr valStr (some val.raw)
-      regularAttrs := regularAttrs.push (← `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr)))
-    | `(dotKV| $key:ident = $val:scientific) =>
-      let keyStr := toString key.getId
-      -- Scientific literals store the value in the first argument
-      let valStr := val.raw.getArgs[0]!.getAtomVal
-      Dot4.validateAttrM keyStr valStr (some val.raw)
-      regularAttrs := regularAttrs.push (← `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr)))
+        regularAttrs := regularAttrs.push (← `(Dot4.Attr.mk $(Lean.quote keyStr) $valExpr))
     | _ => Lean.Macro.throwUnsupported
 
   let attrList ← `([ $[$regularAttrs],* ])
@@ -246,39 +236,41 @@ def parseArrowNode (an : Lean.TSyntax `arrowNode) : Lean.MacroM (Lean.TSyntax `d
   | `(arrowNode| -> $ref:dotNodeRef) => pure ref
   | _ => Lean.Macro.throwUnsupported
 
+/-- Parse a dotNodeId to get the ID expression -/
+def parseDotNodeId (nodeId : Lean.TSyntax `dotNodeId) : Lean.MacroM (Lean.TSyntax `term) := do
+  if nodeId.raw.isAntiquot then
+    -- Interpolated: $(expr)
+    pure ⟨nodeId.raw.getAntiquotTerm⟩
+  else
+    match nodeId with
+    | `(dotNodeId| $id:str) => pure id
+    | `(dotNodeId| $id:ident) => `($(Lean.quote (toString id.getId)))
+    | _ => Lean.Macro.throwUnsupported
+
 /-- Parse node reference to get (id, port) -/
 def parseNodeRef (ref : Lean.TSyntax `dotNodeRef) : Lean.MacroM (Lean.TSyntax `term × Lean.TSyntax `term) := do
-  match ref with
-  | `(dotNodeRef| $id:str) =>
-    pure (id, ← `(Port.mk none none))
-  | `(dotNodeRef| $id:str $p:dotPort) =>
-    let port ← parsePort p
-    pure (id, port)
-  | `(dotNodeRef| $id:str $p1:dotPort $p2:dotPort) =>
-    -- p1 is port name, p2 is compass
-    match p1, p2 with
-    | `(dotPort| : $name:ident), `(dotPort| : $compassId:ident) =>
-      let dir ← parseCompass compassId
-      let port ← `(Port.mk' $(Lean.quote (toString name.getId)) $dir)
-      pure (id, port)
-    | _, _ => pure (id, ← `(Port.mk none none))
-  -- Unquoted identifier cases
-  | `(dotNodeRef| $id:ident) =>
-    let idStr := Lean.quote (toString id.getId)
-    pure (← `($idStr), ← `(Port.mk none none))
-  | `(dotNodeRef| $id:ident $p:dotPort) =>
-    let idStr := Lean.quote (toString id.getId)
-    let port ← parsePort p
-    pure (← `($idStr), port)
-  | `(dotNodeRef| $id:ident $p1:dotPort $p2:dotPort) =>
-    let idStr := Lean.quote (toString id.getId)
-    match p1, p2 with
-    | `(dotPort| : $name:ident), `(dotPort| : $compassId:ident) =>
-      let dir ← parseCompass compassId
-      let port ← `(Port.mk' $(Lean.quote (toString name.getId)) $dir)
-      pure (← `($idStr), port)
-    | _, _ => pure (← `($idStr), ← `(Port.mk none none))
-  | _ => Lean.Macro.throwUnsupported
+  -- Check if the entire nodeRef is an antiquotation
+  if ref.raw.isAntiquot then
+    let term := ⟨ref.raw.getAntiquotTerm⟩
+    pure (term, ← `(Port.mk none none))
+  else
+    match ref with
+    | `(dotNodeRef| $id:dotNodeId) =>
+      let idExpr ← parseDotNodeId id
+      pure (idExpr, ← `(Port.mk none none))
+    | `(dotNodeRef| $id:dotNodeId $p:dotPort) =>
+      let idExpr ← parseDotNodeId id
+      let port ← parsePort p
+      pure (idExpr, port)
+    | `(dotNodeRef| $id:dotNodeId $p1:dotPort $p2:dotPort) =>
+      let idExpr ← parseDotNodeId id
+      match p1, p2 with
+      | `(dotPort| : $name:ident), `(dotPort| : $compassId:ident) =>
+        let dir ← parseCompass compassId
+        let port ← `(Port.mk' $(Lean.quote (toString name.getId)) $dir)
+        pure (idExpr, port)
+      | _, _ => pure (idExpr, ← `(Port.mk none none))
+    | _ => Lean.Macro.throwUnsupported
 
 /-- Parse a record field into a RecordCell term -/
 partial def parseRecordField (field : Lean.TSyntax `recordField) : Lean.MacroM (Lean.TSyntax `term) := do
@@ -302,13 +294,10 @@ def parseSubgraphElems (elems : Lean.TSyntaxArray `subgraphElem) (sgExpr : Lean.
   let mut result := sgExpr
   for elem in elems do
     result ← match elem with
-      | `(subgraphElem| node $id:str $kvs:dotKV*) => do
+      | `(subgraphElem| node $id:dotNodeId $kvs:dotKV*) => do
+        let idExpr ← parseDotNodeId id
         let attrList ← parseKVs kvs
-        `(Subgraph.addNode $result { id := $id, attrs := $attrList })
-      | `(subgraphElem| node $id:ident $kvs:dotKV*) => do
-        let idStr := Lean.quote (toString id.getId)
-        let attrList ← parseKVs kvs
-        `(Subgraph.addNode $result { id := $idStr, attrs := $attrList })
+        `(Subgraph.addNode $result { id := $idExpr, attrs := $attrList })
       | `(subgraphElem| edge $src:dotNodeRef $arrowNodes:arrowNode* $kvs:dotKV*) => do
         let edgeAttrs ← parseEdgeKVs kvs
         let lheadExpr := edgeAttrs.lhead.getD (← `(none))
@@ -343,10 +332,12 @@ macro_rules
 
     for elem in elems do
       graphExpr ← match elem with
-        | `(dotElem| digraph $name:str) =>
-          `({ $graphExpr with name := $name, direction := .directed })
-        | `(dotElem| graph $name:str) =>
-          `({ $graphExpr with name := $name, direction := .undirected })
+        | `(dotElem| digraph $name:dotNodeId) => do
+          let nameExpr ← parseDotNodeId name
+          `({ $graphExpr with name := $nameExpr, direction := .directed })
+        | `(dotElem| graph $name:dotNodeId) => do
+          let nameExpr ← parseDotNodeId name
+          `({ $graphExpr with name := $nameExpr, direction := .undirected })
         | `(dotElem| strict digraph $name:str) =>
           `({ $graphExpr with name := $name, direction := .directed, «strict» := true })
         | `(dotElem| strict graph $name:str) =>
@@ -363,21 +354,20 @@ macro_rules
         | `(dotElem| edge_defaults $kvs:dotKV*) => do
           let attrList ← parseKVs kvs
           `(Graph.withEdgeDefaults $graphExpr $attrList)
-        | `(dotElem| cluster $name:str { $sgElems* }) => do
-          let sgExpr ← `(Subgraph.cluster $name)
+        | `(dotElem| cluster $name:dotNodeId { $sgElems* }) => do
+          let nameExpr ← parseDotNodeId name
+          let sgExpr ← `(Subgraph.cluster $nameExpr)
           let sgExpr ← parseSubgraphElems sgElems sgExpr
           `(Graph.addSubgraph $graphExpr $sgExpr)
-        | `(dotElem| subgraph $name:str { $sgElems* }) => do
-          let sgExpr ← `(Subgraph.plain $name)
+        | `(dotElem| subgraph $name:dotNodeId { $sgElems* }) => do
+          let nameExpr ← parseDotNodeId name
+          let sgExpr ← `(Subgraph.plain $nameExpr)
           let sgExpr ← parseSubgraphElems sgElems sgExpr
           `(Graph.addSubgraph $graphExpr $sgExpr)
-        | `(dotElem| node $id:str $kvs:dotKV*) => do
+        | `(dotElem| node $id:dotNodeId $kvs:dotKV*) => do
+          let idExpr ← parseDotNodeId id
           let attrList ← parseKVs kvs
-          `(Graph.addNode $graphExpr { id := $id, attrs := $attrList })
-        | `(dotElem| node $id:ident $kvs:dotKV*) => do
-          let idStr := Lean.quote (toString id.getId)
-          let attrList ← parseKVs kvs
-          `(Graph.addNode $graphExpr { id := $idStr, attrs := $attrList })
+          `(Graph.addNode $graphExpr { id := $idExpr, attrs := $attrList })
         -- Edge chains: edge "A" -> "B" -> "C" creates A→B, B→C
         | `(dotElem| edge $src:dotNodeRef $arrowNodes:arrowNode* $kvs:dotKV*) => do
           let edgeAttrs ← parseEdgeKVs kvs
