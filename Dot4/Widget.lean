@@ -1,5 +1,6 @@
 import Dot4.Basic
 import Dot4.Render
+import Dot4.Validation
 import Lean
 import ProofWidgets.Component.Basic
 import ProofWidgets.Presentation.Expr
@@ -23,7 +24,7 @@ open Lean Widget Server Elab Command Meta Term
 /-- Props for the Graphviz widget. -/
 structure DotVisualizationProps where
   /-- The DOT source string to render. -/
-  dot : String
+  dotSource : String
   /-- Layout engine (dot, neato, fdp, sfdp, circo, twopi, osage, patchwork). -/
   engine : Option String := none
   /-- Whether this is a diff view. -/
@@ -36,6 +37,8 @@ structure DotVisualizationProps where
   addedEdges : Option (Array String) := none
   /-- Edge IDs that were removed (for diff). -/
   removedEdges : Option (Array String) := none
+  /-- Node order for animation (e.g., topological sort). -/
+  animationOrder : Option (Array String) := none
   deriving Inhabited, Server.RpcEncodable
 
 /-- Widget component using viz.js (Graphviz compiled to WASM). -/
@@ -65,7 +68,7 @@ unsafe def elabShowDotCmd : CommandElab := fun
     let dotStr ← liftTermElabM <| evalGraphToDot g
     liftCoreM <| Widget.savePanelWidgetInfo
       (hash DotVisualization.javascript)
-      (return (← rpcEncode ({ dot := dotStr } : DotVisualizationProps)))
+      (return (← rpcEncode ({ dotSource := dotStr } : DotVisualizationProps)))
       stx
   | stx => throwError "Unexpected syntax {stx}."
 
@@ -82,7 +85,7 @@ def elabShowDotRawCmd : CommandElab := fun
     let dotStr := s.getString
     liftCoreM <| Widget.savePanelWidgetInfo
       (hash DotVisualization.javascript)
-      (return (← rpcEncode ({ dot := dotStr } : DotVisualizationProps)))
+      (return (← rpcEncode ({ dotSource := dotStr } : DotVisualizationProps)))
       stx
   | stx => throwError "Unexpected syntax {stx}."
 
@@ -135,12 +138,39 @@ unsafe def elabShowDotDiffCmd : CommandElab := fun stx => do
   liftCoreM <| Widget.savePanelWidgetInfo
     (hash DotVisualization.javascript)
     (return (← rpcEncode ({
-      dot := dotStr
+      dotSource := dotStr
       isDiff := some true
       addedNodes := some addedNodes
       removedNodes := some removedNodes
       addedEdges := some addedEdges
       removedEdges := some removedEdges
+    } : DotVisualizationProps)))
+    stx
+
+/-! ## Topological Sort Visualization -/
+
+/-- Render a graph with topological sort animation order.
+
+Usage: {lit}`#dot_topo myGraph`
+-/
+syntax (name := showDotTopoCmd) "#dot_topo " term : command
+
+/-- Command elaborator for {lit}`#dot_topo`. -/
+@[command_elab showDotTopoCmd]
+unsafe def elabShowDotTopoCmd : CommandElab := fun stx => do
+  let g := stx[1]
+  let gr ← liftTermElabM do
+    let e ← elabTerm g (some (Lean.mkConst ``Graph))
+    Lean.Meta.evalExpr' Graph ``Graph e
+  let dotStr := gr.toDot
+  let topoOrder := match gr.topologicalSort with
+    | some order => order.toArray
+    | none => #[]
+  liftCoreM <| Widget.savePanelWidgetInfo
+    (hash DotVisualization.javascript)
+    (return (← rpcEncode ({
+      dotSource := dotStr
+      animationOrder := some topoOrder
     } : DotVisualizationProps)))
     stx
 

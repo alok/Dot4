@@ -98,3 +98,29 @@ def newGraph := dot {
 
 -- Shows diff: C and B→C removed (red dashed), D and B→D added (green)
 #dot_diff oldGraph newGraph
+
+/-! ## Topological Sort Animation
+
+Click "Animate" to see nodes highlighted in topological order.
+-/
+
+/-- A DAG for topological sort demo. -/
+def dagGraph := dot {
+  digraph "DAG"
+  rankdir "TB"
+
+  node "A" label="A"
+  node "B" label="B"
+  node "C" label="C"
+  node "D" label="D"
+  node "E" label="E"
+
+  edge "A" → "B"
+  edge "A" → "C"
+  edge "B" → "D"
+  edge "C" → "D"
+  edge "D" → "E"
+}
+
+-- Click "Animate" to see topological traversal: A → B → C → D → E
+#dot_topo dagGraph

@@ -6,12 +6,16 @@ const ENGINES = ['dot', 'neato', 'fdp', 'sfdp', 'circo', 'twopi', 'osage', 'patc
 
 export default function DotVisualization(props) {
   const containerRef = useRef(null);
+  const svgRef = useRef(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedNode, setSelectedNode] = useState(null);
   const [engine, setEngine] = useState(props.engine || 'dot');
+  const [animating, setAnimating] = useState(false);
+  const [highlightedNodes, setHighlightedNodes] = useState(new Set());
+  const animationRef = useRef(null);
 
-  const dotSource = props.dot || 'digraph { a -> b }';
+  const dotSource = props.dotSource || 'digraph { a -> b }';
   const isDiff = props.isDiff || false;
   const addedNodes = new Set(props.addedNodes || []);
   const removedNodes = new Set(props.removedNodes || []);
@@ -126,6 +130,125 @@ export default function DotVisualization(props) {
     });
   }, [isDiff, addedNodes, removedNodes, addedEdges, removedEdges]);
 
+  // Export SVG
+  const exportSVG = useCallback(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svg);
+    const blob = new Blob([svgString], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'graph.svg';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  // Export PNG
+  const exportPNG = useCallback(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svg);
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const scale = 2; // Higher resolution
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+
+      const ctx = canvas.getContext('2d');
+      ctx.scale(scale, scale);
+      ctx.fillStyle = darkMode ? '#1e1e1e' : 'white';
+      ctx.fillRect(0, 0, img.width, img.height);
+      ctx.drawImage(img, 0, 0);
+
+      canvas.toBlob((blob) => {
+        const pngUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = pngUrl;
+        a.download = 'graph.png';
+        a.click();
+        URL.revokeObjectURL(pngUrl);
+      }, 'image/png');
+
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  }, [darkMode]);
+
+  // Animation: highlight nodes in sequence (for topological sort visualization)
+  const animateNodes = useCallback((nodeOrder) => {
+    if (animating || !nodeOrder || nodeOrder.length === 0) return;
+
+    setAnimating(true);
+    let index = 0;
+
+    const step = () => {
+      if (index >= nodeOrder.length) {
+        setAnimating(false);
+        setHighlightedNodes(new Set());
+        return;
+      }
+
+      setHighlightedNodes(new Set(nodeOrder.slice(0, index + 1)));
+      index++;
+      animationRef.current = setTimeout(step, 500);
+    };
+
+    step();
+  }, [animating]);
+
+  // Stop animation
+  const stopAnimation = useCallback(() => {
+    if (animationRef.current) {
+      clearTimeout(animationRef.current);
+    }
+    setAnimating(false);
+    setHighlightedNodes(new Set());
+  }, []);
+
+  // Apply animation highlighting to SVG
+  const applyAnimationHighlighting = useCallback((svgElement) => {
+    if (highlightedNodes.size === 0) return;
+
+    svgElement.querySelectorAll('g.node').forEach(node => {
+      const title = node.querySelector('title');
+      const nodeId = title ? title.textContent : '';
+
+      if (highlightedNodes.has(nodeId)) {
+        node.querySelectorAll('ellipse, polygon, path').forEach(el => {
+          el.style.stroke = '#ff9800';
+          el.style.strokeWidth = '3';
+          el.style.fill = darkMode ? '#4a3000' : '#fff3e0';
+        });
+        node.querySelectorAll('text').forEach(t => {
+          t.style.fill = '#ff9800';
+          t.style.fontWeight = 'bold';
+        });
+      }
+    });
+  }, [highlightedNodes, darkMode]);
+
+  // Get node order from DOT (parse node declarations)
+  const getNodeOrder = useCallback(() => {
+    const nodeMatches = dotSource.matchAll(/"([^"]+)"\s*\[/g);
+    const nodes = [];
+    for (const match of nodeMatches) {
+      if (!nodes.includes(match[1])) {
+        nodes.push(match[1]);
+      }
+    }
+    return nodes;
+  }, [dotSource]);
+
   useEffect(() => {
     let mounted = true;
 
@@ -166,7 +289,9 @@ export default function DotVisualization(props) {
 
           setupInteractivity(svgElement);
           applyDiffHighlighting(svgElement);
+          applyAnimationHighlighting(svgElement);
 
+          svgRef.current = svgElement;
           containerRef.current.appendChild(svgElement);
           setLoading(false);
         }
@@ -180,7 +305,7 @@ export default function DotVisualization(props) {
 
     renderGraph();
     return () => { mounted = false; };
-  }, [dotSource, engine, darkMode, setupInteractivity, applyDiffHighlighting]);
+  }, [dotSource, engine, darkMode, setupInteractivity, applyDiffHighlighting, applyAnimationHighlighting]);
 
   // Error display with better formatting
   if (error) {
@@ -249,6 +374,77 @@ export default function DotVisualization(props) {
             {' '}
             <span style={{ color: '#f44336' }}>● Removed</span>
           </span>
+        )}
+
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
+        {/* Export & Animation buttons */}
+        <button
+          onClick={exportSVG}
+          disabled={loading}
+          style={{
+            padding: '2px 8px',
+            fontSize: '11px',
+            border: '1px solid transparent',
+            borderRadius: '3px',
+            backgroundColor: darkMode ? '#3c3c3c' : '#f5f5f5',
+            color: darkMode ? '#d4d4d4' : '#333',
+            cursor: 'pointer'
+          }}
+          title="Export as SVG"
+        >
+          📥 SVG
+        </button>
+        <button
+          onClick={exportPNG}
+          disabled={loading}
+          style={{
+            padding: '2px 8px',
+            fontSize: '11px',
+            border: '1px solid transparent',
+            borderRadius: '3px',
+            backgroundColor: darkMode ? '#3c3c3c' : '#f5f5f5',
+            color: darkMode ? '#d4d4d4' : '#333',
+            cursor: 'pointer'
+          }}
+          title="Export as PNG"
+        >
+          📥 PNG
+        </button>
+        {!animating ? (
+          <button
+            onClick={() => animateNodes(props.animationOrder || getNodeOrder())}
+            disabled={loading}
+            style={{
+              padding: '2px 8px',
+              fontSize: '11px',
+              border: '1px solid transparent',
+              borderRadius: '3px',
+              backgroundColor: darkMode ? '#3c3c3c' : '#f5f5f5',
+              color: darkMode ? '#d4d4d4' : '#333',
+              cursor: 'pointer'
+            }}
+            title="Animate node traversal"
+          >
+            ▶ Animate
+          </button>
+        ) : (
+          <button
+            onClick={stopAnimation}
+            style={{
+              padding: '2px 8px',
+              fontSize: '11px',
+              border: '1px solid #ff9800',
+              borderRadius: '3px',
+              backgroundColor: darkMode ? '#4a3000' : '#fff3e0',
+              color: '#ff9800',
+              cursor: 'pointer'
+            }}
+            title="Stop animation"
+          >
+            ⏹ Stop
+          </button>
         )}
       </div>
 
