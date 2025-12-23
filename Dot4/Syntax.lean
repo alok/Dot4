@@ -134,18 +134,18 @@ def parseKVs (kvs : Lean.TSyntaxArray `dotKV) : Lean.MacroM (Lean.TSyntax `term)
     | `(dotKV| $key:ident = $val:str) =>
       let keyStr := toString key.getId
       let valStr := val.getString
-      -- Validate the attribute at macro expansion time
-      Dot4.validateAttrM keyStr valStr
+      -- Validate the attribute, highlighting the value on error
+      Dot4.validateAttrM keyStr valStr (some val.raw)
       `(Dot4.Attr.mk $(Lean.quote keyStr) $val)
     | `(dotKV| $key:ident = $val:ident) =>
       let keyStr := toString key.getId
       let valStr := toString val.getId
-      Dot4.validateAttrM keyStr valStr
+      Dot4.validateAttrM keyStr valStr (some val.raw)
       `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr))
     | `(dotKV| $key:ident = $val:num) =>
       let keyStr := toString key.getId
       let valStr := toString val.getNat
-      Dot4.validateAttrM keyStr valStr
+      Dot4.validateAttrM keyStr valStr (some val.raw)
       `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr))
     | _ => Lean.Macro.throwUnsupported
   `([ $[$attrs],* ])
@@ -170,7 +170,7 @@ def parseEdgeKVs (kvs : Lean.TSyntaxArray `dotKV) : Lean.MacroM EdgeAttrResult :
     | `(dotKV| $key:ident = $val:str) =>
       let keyStr := toString key.getId
       let valStr := val.getString
-      Dot4.validateAttrM keyStr valStr
+      Dot4.validateAttrM keyStr valStr (some val.raw)
       if keyStr == "lhead" then
         lheadVal := some (← `(some $val))
       else if keyStr == "ltail" then
@@ -180,7 +180,7 @@ def parseEdgeKVs (kvs : Lean.TSyntaxArray `dotKV) : Lean.MacroM EdgeAttrResult :
     | `(dotKV| $key:ident = $val:ident) =>
       let keyStr := toString key.getId
       let valStr := toString val.getId
-      Dot4.validateAttrM keyStr valStr
+      Dot4.validateAttrM keyStr valStr (some val.raw)
       if keyStr == "lhead" then
         lheadVal := some (← `(some $(Lean.quote valStr)))
       else if keyStr == "ltail" then
@@ -190,7 +190,7 @@ def parseEdgeKVs (kvs : Lean.TSyntaxArray `dotKV) : Lean.MacroM EdgeAttrResult :
     | `(dotKV| $key:ident = $val:num) =>
       let keyStr := toString key.getId
       let valStr := toString val.getNat
-      Dot4.validateAttrM keyStr valStr
+      Dot4.validateAttrM keyStr valStr (some val.raw)
       regularAttrs := regularAttrs.push (← `(Dot4.Attr.mk $(Lean.quote keyStr) $(Lean.quote valStr)))
     | _ => Lean.Macro.throwUnsupported
 

@@ -130,11 +130,15 @@ def getAttrError (key value : String) : Option String :=
   | .error msg => some msg
 
 /-- Validate attributes at macro expansion time.
-    This is called from Syntax.lean to check attributes in the DSL. -/
-def validateAttrM (key value : String) : MacroM Unit := do
+    This is called from Syntax.lean to check attributes in the DSL.
+    The optional stx parameter allows error spans to highlight just the value. -/
+def validateAttrM (key value : String) (stx? : Option Lean.Syntax := none) : Lean.MacroM Unit := do
   match validateAttr key value with
   | .ok _ => pure ()
-  | .error msg => Macro.throwError msg
+  | .error msg =>
+    match stx? with
+    | some stx => Lean.Macro.throwErrorAt stx msg
+    | none => Lean.Macro.throwError msg
 
 /-- Parse and validate a style string, returning list of valid styles -/
 def parseStyles (s : String) : List String :=
