@@ -61,6 +61,9 @@ Also works with raw DOT strings:
 - **Layout Engine Selector**: Switch between 8 Graphviz engines (dot, neato, fdp, sfdp, circo, twopi, osage, patchwork) directly in the UI
 - **Dark Mode**: Auto-detects VS Code theme and adapts colors
 - **Click to Inspect**: Click nodes/edges to see details (id, label, shape)
+- **Go to Definition**: Double-click nodes/edges to jump to their source location in the editor
+- **Neighbor Highlighting**: Hover over nodes to highlight predecessors (blue) and successors (orange)
+- **Minimap**: Toggle minimap for navigating large graphs
 - **Export**: Download graph as SVG or PNG
 - **Animation**: Animate node traversal (e.g., topological sort)
 - **Graph Diff**: Compare two graphs with visual highlighting

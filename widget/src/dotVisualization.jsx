@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo, useContext } from 'react';
 import { instance } from '@viz-js/viz';
+import { EditorContext } from '@leanprover/infoview';
 
 // Layout engines available in Graphviz
 const ENGINES = ['dot', 'neato', 'fdp', 'sfdp', 'circo', 'twopi', 'osage', 'patchwork'];
@@ -7,12 +8,15 @@ const ENGINES = ['dot', 'neato', 'fdp', 'sfdp', 'circo', 'twopi', 'osage', 'patc
 export default function DotVisualization(props) {
   const containerRef = useRef(null);
   const svgRef = useRef(null);
+  const minimapRef = useRef(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedNode, setSelectedNode] = useState(null);
   const [engine, setEngine] = useState(props.engine || 'dot');
   const [animating, setAnimating] = useState(false);
   const [highlightedNodes, setHighlightedNodes] = useState(new Set());
+  const [hoveredNode, setHoveredNode] = useState(null);
+  const [showMinimap, setShowMinimap] = useState(true);
   const animationRef = useRef(null);
 
   const dotSource = props.dotSource || 'digraph { a -> b }';
@@ -21,6 +25,34 @@ export default function DotVisualization(props) {
   const removedNodes = new Set(props.removedNodes || []);
   const addedEdges = new Set(props.addedEdges || []);
   const removedEdges = new Set(props.removedEdges || []);
+
+  // Get editor connection for go-to-definition
+  const editorConnection = useContext(EditorContext);
+
+  // Build map from element ID to source location
+  const sourceLocationMap = useMemo(() => {
+    const map = new Map();
+    if (props.sourceLocations) {
+      for (const loc of props.sourceLocations) {
+        map.set(loc.id, {
+          uri: loc.uri,
+          range: {
+            start: { line: loc.startLine, character: loc.startChar },
+            end: { line: loc.endLine, character: loc.endChar }
+          }
+        });
+      }
+    }
+    return map;
+  }, [props.sourceLocations]);
+
+  // Navigate to source location on click
+  const goToSource = useCallback((elementId) => {
+    const loc = sourceLocationMap.get(elementId);
+    if (loc && editorConnection) {
+      editorConnection.revealLocation(loc);
+    }
+  }, [sourceLocationMap, editorConnection]);
 
   // Detect dark mode from VS Code theme
   const isDarkMode = () => {
@@ -39,13 +71,47 @@ export default function DotVisualization(props) {
     return () => observer.disconnect();
   }, []);
 
+  // Parse graph structure for neighbor highlighting
+  const graphStructure = useMemo(() => {
+    const predecessors = new Map(); // node -> Set of nodes that point TO it
+    const successors = new Map();   // node -> Set of nodes it points TO
+    const edgeMap = new Map();      // "src->dst" -> true
+
+    // Parse edges from DOT source
+    // Matches: "a" -> "b", a -> b, "node1" -> "node2", etc.
+    const edgeRegex = /["']?([^"'\s\[\]{}]+)["']?\s*-[->]\s*["']?([^"'\s\[\]{}]+)["']?/g;
+    let match;
+    while ((match = edgeRegex.exec(dotSource)) !== null) {
+      const [, src, dst] = match;
+      if (src && dst && src !== '{' && dst !== '}') {
+        if (!successors.has(src)) successors.set(src, new Set());
+        if (!predecessors.has(dst)) predecessors.set(dst, new Set());
+        successors.get(src).add(dst);
+        predecessors.get(dst).add(src);
+        edgeMap.set(`${src}->${dst}`, true);
+        edgeMap.set(`${src}--${dst}`, true); // undirected variant
+      }
+    }
+
+    return { predecessors, successors, edgeMap };
+  }, [dotSource]);
+
+  // Get neighbors of a node
+  const getNeighbors = useCallback((nodeId) => {
+    const preds = graphStructure.predecessors.get(nodeId) || new Set();
+    const succs = graphStructure.successors.get(nodeId) || new Set();
+    return { predecessors: preds, successors: succs };
+  }, [graphStructure]);
+
   // Handle node/edge clicks for interactivity
   const setupInteractivity = useCallback((svgElement) => {
     // Make nodes clickable
     svgElement.querySelectorAll('g.node').forEach(node => {
-      node.style.cursor = 'pointer';
       const title = node.querySelector('title');
       const nodeId = title ? title.textContent : 'unknown';
+      const hasSourceLoc = sourceLocationMap.has(nodeId);
+
+      node.style.cursor = hasSourceLoc ? 'pointer' : 'default';
 
       node.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -53,29 +119,58 @@ export default function DotVisualization(props) {
         const shape = node.querySelector('ellipse') ? 'ellipse' :
                       node.querySelector('polygon') ? 'polygon' :
                       node.querySelector('path') ? 'path' : 'unknown';
-        setSelectedNode({ type: 'node', id: nodeId, label, shape });
+        setSelectedNode({
+          type: 'node',
+          id: nodeId,
+          label,
+          shape,
+          hasSourceLoc
+        });
       });
 
-      // Hover effect
+      // Double-click to go to source
+      node.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        goToSource(nodeId);
+      });
+
+      // Hover effect with neighbor highlighting
       node.addEventListener('mouseenter', () => {
         node.style.opacity = '0.8';
+        setHoveredNode(nodeId);
       });
       node.addEventListener('mouseleave', () => {
         node.style.opacity = '1';
+        setHoveredNode(null);
       });
     });
 
     // Make edges clickable
     svgElement.querySelectorAll('g.edge').forEach(edge => {
-      edge.style.cursor = 'pointer';
       const title = edge.querySelector('title');
       const edgeId = title ? title.textContent : 'unknown';
+      const hasSourceLoc = sourceLocationMap.has(edgeId);
+
+      edge.style.cursor = hasSourceLoc ? 'pointer' : 'default';
 
       edge.addEventListener('click', (e) => {
         e.stopPropagation();
         const [src, dst] = edgeId.split('->').map(s => s.trim());
         const label = edge.querySelector('text')?.textContent || '';
-        setSelectedNode({ type: 'edge', id: edgeId, src, dst, label });
+        setSelectedNode({
+          type: 'edge',
+          id: edgeId,
+          src,
+          dst,
+          label,
+          hasSourceLoc
+        });
+      });
+
+      // Double-click to go to source
+      edge.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        goToSource(edgeId);
       });
     });
 
@@ -83,7 +178,7 @@ export default function DotVisualization(props) {
     svgElement.addEventListener('click', () => {
       setSelectedNode(null);
     });
-  }, []);
+  }, [sourceLocationMap, goToSource]);
 
   // Apply diff highlighting
   const applyDiffHighlighting = useCallback((svgElement) => {
@@ -237,6 +332,190 @@ export default function DotVisualization(props) {
     });
   }, [highlightedNodes, darkMode]);
 
+  // Apply neighbor highlighting on hover
+  const applyNeighborHighlighting = useCallback((svgElement) => {
+    if (!hoveredNode) return;
+
+    const { predecessors, successors } = getNeighbors(hoveredNode);
+
+    // Highlight predecessor nodes (blue - incoming)
+    svgElement.querySelectorAll('g.node').forEach(node => {
+      const title = node.querySelector('title');
+      const nodeId = title ? title.textContent : '';
+
+      if (predecessors.has(nodeId)) {
+        node.querySelectorAll('ellipse, polygon, path').forEach(el => {
+          el.style.stroke = '#2196f3';
+          el.style.strokeWidth = '3';
+          el.style.filter = 'drop-shadow(0 0 4px #2196f3)';
+        });
+        node.querySelectorAll('text').forEach(t => {
+          t.style.fill = '#2196f3';
+          t.style.fontWeight = 'bold';
+        });
+      } else if (successors.has(nodeId)) {
+        // Highlight successor nodes (orange - outgoing)
+        node.querySelectorAll('ellipse, polygon, path').forEach(el => {
+          el.style.stroke = '#ff9800';
+          el.style.strokeWidth = '3';
+          el.style.filter = 'drop-shadow(0 0 4px #ff9800)';
+        });
+        node.querySelectorAll('text').forEach(t => {
+          t.style.fill = '#ff9800';
+          t.style.fontWeight = 'bold';
+        });
+      } else if (nodeId !== hoveredNode) {
+        // Dim non-related nodes
+        node.style.opacity = '0.3';
+      }
+    });
+
+    // Highlight edges connected to hovered node
+    svgElement.querySelectorAll('g.edge').forEach(edge => {
+      const title = edge.querySelector('title');
+      const edgeId = title ? title.textContent : '';
+      const [src, dst] = edgeId.split('->').map(s => s.trim());
+
+      if (src === hoveredNode) {
+        // Outgoing edge (orange)
+        edge.querySelectorAll('path, polygon').forEach(el => {
+          el.style.stroke = '#ff9800';
+          el.style.strokeWidth = '2.5';
+          el.style.filter = 'drop-shadow(0 0 3px #ff9800)';
+        });
+      } else if (dst === hoveredNode) {
+        // Incoming edge (blue)
+        edge.querySelectorAll('path, polygon').forEach(el => {
+          el.style.stroke = '#2196f3';
+          el.style.strokeWidth = '2.5';
+          el.style.filter = 'drop-shadow(0 0 3px #2196f3)';
+        });
+      } else {
+        // Dim non-related edges
+        edge.style.opacity = '0.2';
+      }
+    });
+  }, [hoveredNode, getNeighbors]);
+
+  // Render minimap
+  const renderMinimap = useCallback(() => {
+    if (!svgRef.current || !minimapRef.current || !showMinimap) return;
+
+    const svg = svgRef.current;
+    const canvas = minimapRef.current;
+    const ctx = canvas.getContext('2d');
+
+    // Get SVG dimensions
+    const svgRect = svg.getBoundingClientRect();
+    const viewBox = svg.getAttribute('viewBox');
+    let svgWidth, svgHeight;
+
+    if (viewBox) {
+      const [, , w, h] = viewBox.split(' ').map(Number);
+      svgWidth = w;
+      svgHeight = h;
+    } else {
+      svgWidth = svgRect.width;
+      svgHeight = svgRect.height;
+    }
+
+    // Set canvas size (minimap is 150px wide max)
+    const maxWidth = 150;
+    const scale = Math.min(maxWidth / svgWidth, 100 / svgHeight);
+    canvas.width = svgWidth * scale;
+    canvas.height = svgHeight * scale;
+
+    // Clear canvas
+    ctx.fillStyle = darkMode ? '#1e1e1e' : '#f5f5f5';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw simplified nodes
+    svg.querySelectorAll('g.node').forEach(node => {
+      const ellipse = node.querySelector('ellipse');
+      const polygon = node.querySelector('polygon');
+      const title = node.querySelector('title');
+      const nodeId = title ? title.textContent : '';
+
+      let cx, cy, rx, ry;
+
+      if (ellipse) {
+        cx = parseFloat(ellipse.getAttribute('cx')) * scale;
+        cy = parseFloat(ellipse.getAttribute('cy')) * scale;
+        rx = Math.max(parseFloat(ellipse.getAttribute('rx')) * scale, 2);
+        ry = Math.max(parseFloat(ellipse.getAttribute('ry')) * scale, 2);
+      } else if (polygon) {
+        const points = polygon.getAttribute('points').split(' ').map(p => {
+          const [x, y] = p.split(',').map(Number);
+          return { x: x * scale, y: y * scale };
+        });
+        cx = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+        cy = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+        rx = ry = 3;
+      } else {
+        return;
+      }
+
+      // Determine node color based on state
+      if (nodeId === hoveredNode) {
+        ctx.fillStyle = '#4caf50';
+      } else if (hoveredNode) {
+        const { predecessors, successors } = getNeighbors(hoveredNode);
+        if (predecessors.has(nodeId)) {
+          ctx.fillStyle = '#2196f3';
+        } else if (successors.has(nodeId)) {
+          ctx.fillStyle = '#ff9800';
+        } else {
+          ctx.fillStyle = darkMode ? '#555' : '#999';
+        }
+      } else {
+        ctx.fillStyle = darkMode ? '#888' : '#666';
+      }
+
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
+      ctx.fill();
+    });
+
+    // Draw simplified edges
+    ctx.strokeStyle = darkMode ? '#444' : '#ccc';
+    ctx.lineWidth = 0.5;
+    svg.querySelectorAll('g.edge path').forEach(path => {
+      const d = path.getAttribute('d');
+      if (!d) return;
+
+      // Simple path parsing - just get the start and end points
+      const moves = d.match(/[MC]\s*[\d.,\s-]+/g);
+      if (!moves || moves.length === 0) return;
+
+      ctx.beginPath();
+      moves.forEach((cmd, i) => {
+        const coords = cmd.substring(1).trim().split(/[\s,]+/).map(Number);
+        if (coords.length >= 2) {
+          const x = coords[coords.length - 2] * scale;
+          const y = coords[coords.length - 1] * scale;
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+      });
+      ctx.stroke();
+    });
+
+    // Draw border
+    ctx.strokeStyle = darkMode ? '#555' : '#ddd';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+  }, [showMinimap, darkMode, hoveredNode, getNeighbors]);
+
+  // Update minimap when SVG changes
+  useEffect(() => {
+    if (!loading) {
+      renderMinimap();
+    }
+  }, [loading, renderMinimap, hoveredNode]);
+
   // Get node order from DOT (parse node declarations)
   const getNodeOrder = useCallback(() => {
     const nodeMatches = dotSource.matchAll(/"([^"]+)"\s*\[/g);
@@ -290,6 +569,7 @@ export default function DotVisualization(props) {
           setupInteractivity(svgElement);
           applyDiffHighlighting(svgElement);
           applyAnimationHighlighting(svgElement);
+          applyNeighborHighlighting(svgElement);
 
           svgRef.current = svgElement;
           containerRef.current.appendChild(svgElement);
@@ -305,7 +585,7 @@ export default function DotVisualization(props) {
 
     renderGraph();
     return () => { mounted = false; };
-  }, [dotSource, engine, darkMode, setupInteractivity, applyDiffHighlighting, applyAnimationHighlighting]);
+  }, [dotSource, engine, darkMode, hoveredNode, setupInteractivity, applyDiffHighlighting, applyAnimationHighlighting, applyNeighborHighlighting]);
 
   // Error display with better formatting
   if (error) {
@@ -381,6 +661,23 @@ export default function DotVisualization(props) {
 
         {/* Export & Animation buttons */}
         <button
+          onClick={() => setShowMinimap(!showMinimap)}
+          style={{
+            padding: '2px 8px',
+            fontSize: '11px',
+            border: showMinimap ? '1px solid #007acc' : '1px solid transparent',
+            borderRadius: '3px',
+            backgroundColor: showMinimap
+              ? (darkMode ? '#264f78' : '#e3f2fd')
+              : (darkMode ? '#3c3c3c' : '#f5f5f5'),
+            color: darkMode ? '#d4d4d4' : '#333',
+            cursor: 'pointer'
+          }}
+          title="Toggle minimap"
+        >
+          🗺️
+        </button>
+        <button
           onClick={exportSVG}
           disabled={loading}
           style={{
@@ -454,10 +751,60 @@ export default function DotVisualization(props) {
         </div>
       )}
 
-      <div ref={containerRef} />
+      <div style={{ position: 'relative' }}>
+        <div ref={containerRef} />
+
+        {/* Minimap */}
+        {showMinimap && !loading && (
+          <div style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            borderRadius: '4px',
+            overflow: 'hidden',
+            boxShadow: darkMode
+              ? '0 2px 8px rgba(0,0,0,0.5)'
+              : '0 2px 8px rgba(0,0,0,0.15)',
+            border: darkMode ? '1px solid #444' : '1px solid #ddd'
+          }}>
+            <canvas
+              ref={minimapRef}
+              style={{
+                display: 'block',
+                maxWidth: '150px',
+                maxHeight: '100px'
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Hover info - neighbor counts */}
+      {hoveredNode && (
+        <div style={{
+          marginTop: '8px',
+          padding: '8px',
+          backgroundColor: darkMode ? '#2d2d2d' : '#f5f5f5',
+          borderRadius: '4px',
+          fontSize: '12px',
+          fontFamily: 'monospace',
+          color: darkMode ? '#d4d4d4' : '#333',
+          display: 'flex',
+          gap: '16px',
+          alignItems: 'center'
+        }}>
+          <span><strong>{hoveredNode}</strong></span>
+          <span style={{ color: '#2196f3' }}>
+            ← {getNeighbors(hoveredNode).predecessors.size} in
+          </span>
+          <span style={{ color: '#ff9800' }}>
+            → {getNeighbors(hoveredNode).successors.size} out
+          </span>
+        </div>
+      )}
 
       {/* Selected element details */}
-      {selectedNode && (
+      {selectedNode && !hoveredNode && (
         <div style={{
           marginTop: '8px',
           padding: '8px',
@@ -468,16 +815,56 @@ export default function DotVisualization(props) {
           color: darkMode ? '#d4d4d4' : '#333'
         }}>
           {selectedNode.type === 'node' ? (
-            <>
-              <strong>Node:</strong> {selectedNode.id}<br/>
-              <strong>Label:</strong> {selectedNode.label}<br/>
-              <strong>Shape:</strong> {selectedNode.shape}
-            </>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <div>
+                <strong>Node:</strong> {selectedNode.id}<br/>
+                <strong>Label:</strong> {selectedNode.label}<br/>
+                <strong>Shape:</strong> {selectedNode.shape}
+              </div>
+              {selectedNode.hasSourceLoc && (
+                <button
+                  onClick={() => goToSource(selectedNode.id)}
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '11px',
+                    border: '1px solid #007acc',
+                    borderRadius: '3px',
+                    backgroundColor: darkMode ? '#264f78' : '#e3f2fd',
+                    color: darkMode ? '#d4d4d4' : '#333',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title="Go to source definition (or double-click node)"
+                >
+                  📍 Go to source
+                </button>
+              )}
+            </div>
           ) : (
-            <>
-              <strong>Edge:</strong> {selectedNode.src} → {selectedNode.dst}<br/>
-              {selectedNode.label && <><strong>Label:</strong> {selectedNode.label}</>}
-            </>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <div>
+                <strong>Edge:</strong> {selectedNode.src} → {selectedNode.dst}<br/>
+                {selectedNode.label && <><strong>Label:</strong> {selectedNode.label}</>}
+              </div>
+              {selectedNode.hasSourceLoc && (
+                <button
+                  onClick={() => goToSource(selectedNode.id)}
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '11px',
+                    border: '1px solid #007acc',
+                    borderRadius: '3px',
+                    backgroundColor: darkMode ? '#264f78' : '#e3f2fd',
+                    color: darkMode ? '#d4d4d4' : '#333',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title="Go to source definition (or double-click edge)"
+                >
+                  📍 Go to source
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}

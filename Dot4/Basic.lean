@@ -32,6 +32,20 @@ structure Attr where
   value : String
   deriving Repr, BEq, Hashable
 
+/-- Source location for go-to-definition support -/
+structure SourceRange where
+  /-- File URI -/
+  uri : String
+  /-- Start line (0-indexed) -/
+  startLine : Nat
+  /-- Start character (0-indexed) -/
+  startChar : Nat
+  /-- End line (0-indexed) -/
+  endLine : Nat
+  /-- End character (0-indexed) -/
+  endChar : Nat
+  deriving Repr, BEq, Inhabited
+
 /-- A node in the graph -/
 structure Node where
   /-- Unique node identifier -/
@@ -40,6 +54,8 @@ structure Node where
   label : Option String := none
   /-- Node attributes like `shape`, `color`, `style` -/
   attrs : List Attr := []
+  /-- Source location for go-to-definition -/
+  srcRange : Option SourceRange := none
   deriving Repr
 
 /-- Compass point for edge ports. Maps to DOT compass points: `n`, `ne`, `e`, etc. -/
@@ -88,6 +104,8 @@ structure Edge where
   lhead : Option String := none
   /-- Cluster to route edge tail from (requires `compound=true` on graph) -/
   ltail : Option String := none
+  /-- Source location for go-to-definition -/
+  srcRange : Option SourceRange := none
   deriving Repr
 
 /-- Graph direction: directed (`digraph`) or undirected (`graph`) -/

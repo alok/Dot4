@@ -21,6 +21,22 @@ open Lean Widget Server Elab Command Meta Term
 
 /-! ## Graphviz Widget (viz.js) -/
 
+/-- Source location for click-to-source navigation. -/
+structure SourceLocation where
+  /-- Element ID (node ID or "src->dst" for edges). -/
+  id : String
+  /-- File URI. -/
+  uri : String
+  /-- Start line (0-indexed). -/
+  startLine : Nat
+  /-- Start character (0-indexed). -/
+  startChar : Nat
+  /-- End line (0-indexed). -/
+  endLine : Nat
+  /-- End character (0-indexed). -/
+  endChar : Nat
+  deriving Inhabited, Server.RpcEncodable
+
 /-- Props for the Graphviz widget. -/
 structure DotVisualizationProps where
   /-- The DOT source string to render. -/
@@ -39,6 +55,8 @@ structure DotVisualizationProps where
   removedEdges : Option (Array String) := none
   /-- Node order for animation (e.g., topological sort). -/
   animationOrder : Option (Array String) := none
+  /-- Source locations for click-to-source navigation. -/
+  sourceLocations : Option (Array SourceLocation) := none
   deriving Inhabited, Server.RpcEncodable
 
 /-- Widget component using viz.js (Graphviz compiled to WASM). -/
@@ -47,6 +65,36 @@ def DotVisualization : ProofWidgets.Component DotVisualizationProps where
   javascript := include_str ".." / "build" / "js" / "dotVisualization.js"
 
 /-! ## Commands -/
+
+/-- Convert SourceRange to SourceLocation for a node. -/
+def nodeSourceLocation (n : Node) : Option SourceLocation :=
+  n.srcRange.map fun r => {
+    id := n.id
+    uri := r.uri
+    startLine := r.startLine
+    startChar := r.startChar
+    endLine := r.endLine
+    endChar := r.endChar
+  }
+
+/-- Convert SourceRange to SourceLocation for an edge. -/
+def edgeSourceLocation (e : Edge) : Option SourceLocation :=
+  e.srcRange.map fun r => {
+    id := s!"{e.src}->{e.dst}"
+    uri := r.uri
+    startLine := r.startLine
+    startChar := r.startChar
+    endLine := r.endLine
+    endChar := r.endChar
+  }
+
+/-- Extract all source locations from a Graph. -/
+def Graph.sourceLocations (g : Graph) : Array SourceLocation :=
+  let nodeLocs := g.nodes.filterMap nodeSourceLocation
+  let edgeLocs := g.edges.filterMap edgeSourceLocation
+  let subgraphNodeLocs := g.subgraphs.map (·.nodes.filterMap nodeSourceLocation) |>.flatten
+  let subgraphEdgeLocs := g.subgraphs.map (·.edges.filterMap edgeSourceLocation) |>.flatten
+  (nodeLocs ++ edgeLocs ++ subgraphNodeLocs ++ subgraphEdgeLocs).toArray
 
 /-- Evaluate Graph.toDot at compile time. -/
 unsafe def evalGraphToDot (stx : Syntax) : TermElabM String := do
@@ -65,10 +113,19 @@ syntax (name := showDotCmd) "#dot " term : command
 @[command_elab showDotCmd]
 unsafe def elabShowDotCmd : CommandElab := fun
   | stx@`(#dot $g:term) => do
-    let dotStr ← liftTermElabM <| evalGraphToDot g
+    let (dotStr, srcLocs) ← liftTermElabM do
+      let expr ← elabTerm g (some (Lean.mkConst ``Graph))
+      let gr ← Lean.Meta.evalExpr' Graph ``Graph expr
+      let dotStr := gr.toDot
+      let srcLocs := gr.sourceLocations
+      pure (dotStr, srcLocs)
+    let props : DotVisualizationProps := {
+      dotSource := dotStr
+      sourceLocations := if srcLocs.isEmpty then none else some srcLocs
+    }
     liftCoreM <| Widget.savePanelWidgetInfo
       (hash DotVisualization.javascript)
-      (return (← rpcEncode ({ dotSource := dotStr } : DotVisualizationProps)))
+      (return (← rpcEncode props))
       stx
   | stx => throwError "Unexpected syntax {stx}."
 
