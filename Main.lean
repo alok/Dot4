@@ -342,5 +342,3 @@ def main : IO Unit := do
 
   IO.println "━━━ Example 12: Unquoted Floats ━━━"
   IO.println unquotedDemo.toDot
-
-
