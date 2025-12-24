@@ -16,9 +16,9 @@ def simpleGraph : Graph := dot {
 
   node "A" label="Start"
   node "B" label="Middle"
-  node "C" label="End"
+  node "C" label="End" shape=circle
 
-  edge "A" → "B"
+  edge A → "B"
   edge "B" → "C"
 }
 #dot simpleGraph
@@ -342,3 +342,5 @@ def main : IO Unit := do
 
   IO.println "━━━ Example 12: Unquoted Floats ━━━"
   IO.println unquotedDemo.toDot
+
+

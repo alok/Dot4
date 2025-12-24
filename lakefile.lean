@@ -19,6 +19,9 @@ require proofwidgets from git
 require hexluthor from git
   "https://github.com/alok/HexLuthor" @ "main"
 
+require Graph4 from git
+  "https://github.com/alok/Graph4" @ "main"
+
 lean_lib Dot4
 
 @[default_target]
