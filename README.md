@@ -342,6 +342,29 @@ Pipe to Graphviz:
 lake exe dot4 | dot -Tpng -o output.png
 ```
 
+## Parsing DOT Files
+
+Parse DOT strings back into Dot4 graphs for round-trip support:
+
+```lean
+def dotString := "digraph G { a -> b; b -> c; }"
+
+match Graph.fromDot dotString with
+| .ok graph =>
+  -- graph is a Dot4.Graph
+  IO.println s!"Parsed {graph.nodes.length} nodes"
+| .error msg =>
+  IO.println s!"Parse error: {msg}"
+```
+
+Supports full DOT syntax including:
+- Directed (`digraph`) and undirected (`graph`) graphs
+- `strict` mode
+- Node and edge statements with attributes
+- Subgraphs and clusters
+- Port syntax (`:port:compass`)
+- Quoted and unquoted identifiers
+
 ## License
 
 MIT
