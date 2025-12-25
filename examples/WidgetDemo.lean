@@ -260,3 +260,25 @@ def animalClasses := classDiagram "Animals"
   |>.addInheritance "cat" "animal"
 
 #dot animalClasses
+
+/-! ## Graph4 Integration
+
+Convert Graph4 graphs to Dot4 for visualization.
+-/
+
+/-- Create a Graph4 cycle graph and visualize it. -/
+def graph4Cycle := Graph4.cycleGraph "Cycle" ["A", "B", "C", "D"]
+
+-- Convert to Dot4 and render
+#dot (Dot4.fromGraph4 graph4Cycle)
+
+/-- Create a Graph4 star graph. -/
+def graph4Star := Graph4.starGraph "Star" "hub" ["spoke1", "spoke2", "spoke3"]
+
+#dot (Dot4.fromGraph4 graph4Star)
+
+/-- Graph4 with source/sink highlighting. -/
+def graph4Pipeline := Graph4.linearGraph "Pipeline" ["source", "process", "filter", "sink"]
+
+-- Sources highlighted in green, sinks in red
+#dot (Dot4.fromGraph4Highlighted graph4Pipeline)

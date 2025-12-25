@@ -342,6 +342,37 @@ Pipe to Graphviz:
 lake exe dot4 | dot -Tpng -o output.png
 ```
 
+## Graph4 Integration
+
+Visualize [Graph4](https://github.com/alok/Graph4) graphs directly with Dot4:
+
+```lean
+import Dot4
+import Graph4
+
+-- Create a Graph4 graph
+def myGraph4 := Graph4.cycleGraph "Cycle" ["A", "B", "C", "D"]
+
+-- Convert and render
+#dot (Dot4.fromGraph4 myGraph4)
+```
+
+Available converters:
+- `fromGraph4`: Basic conversion
+- `fromGraph4WithStyle`: Custom node/edge styling functions
+- `fromGraph4Highlighted`: Highlights sources (green) and sinks (red)
+- `fromGraph4Weighted`: Edge thickness based on weight
+
+```lean
+-- Custom styling
+let styled := Dot4.fromGraph4WithStyle graph4
+  (nodeStyle := fun n => if n.label.isSome then [Attr.shapeT Shape.box] else [])
+  (edgeStyle := fun e => if e.weight.isSome then [Attr.style "bold"] else [])
+
+-- Highlight sources and sinks
+#dot (Dot4.fromGraph4Highlighted myPipeline)
+```
+
 ## Parsing DOT Files
 
 Parse DOT strings back into Dot4 graphs for round-trip support:
@@ -380,3 +411,5 @@ Issues and PRs welcome! The codebase is structured as:
 - `Dot4/Shapes.lean` - Type-safe shapes and enums
 - `Dot4/Advanced.lean` - Graph operations and utilities
 - `Dot4/Widget.lean` - VS Code infoview widget (`#dot`, `#dot_raw`, `#dot_diff`)
+- `Dot4/Graph4.lean` - Graph4 integration
+- `Dot4/Parser/` - DOT parser for `Graph.fromDot`
