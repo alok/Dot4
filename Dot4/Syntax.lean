@@ -1,6 +1,7 @@
 import Dot4.Render
 import Dot4.Elab
 import Dot4.Record
+import Lean.Elab.Term
 
 /-!
 # DOT DSL Syntax
@@ -459,5 +460,97 @@ macro_rules
         | _ => Lean.Macro.throwUnsupported
 
     pure graphExpr
+
+/-! ## Source Location Extraction for Go-to-Definition -/
+
+open Lean Elab Term Meta
+
+/-- Extract SourceRange from syntax position info -/
+def syntaxToSourceRange (stx : Syntax) : TermElabM (Option SourceRange) := do
+  let some startPos := stx.getPos? | return none
+  let some endPos := stx.getTailPos? | return none
+  let fileMap ← getFileMap
+  let fileName ← getFileName
+  let uri := s!"file://{fileName}"
+  let startLoc := fileMap.toPosition startPos
+  let endLoc := fileMap.toPosition endPos
+  return some {
+    uri := uri
+    startLine := startLoc.line - 1  -- 0-indexed
+    startChar := startLoc.column
+    endLine := endLoc.line - 1
+    endChar := endLoc.column
+  }
+
+/-- Extract node ID from dotNodeId syntax -/
+def extractNodeId (nodeId : Syntax) : Option String :=
+  if nodeId.isAntiquot then none
+  else if nodeId.isOfKind `str then
+    nodeId.isStrLit?
+  else if nodeId.isOfKind `ident then
+    some (nodeId.getId.toString)
+  else none
+
+/-- Get atom value from syntax if it's an atom -/
+def getAtomValue (stx : Syntax) : Option String :=
+  if stx.isAtom then some stx.getAtomVal else none
+
+/-- Walk dot syntax and extract node/edge source locations -/
+partial def extractSourceLocations (stx : Syntax) : TermElabM (List (String × SourceRange)) := do
+  let mut locs : List (String × SourceRange) := []
+
+  -- Match different syntax kinds
+  if stx.isOfKind `Dot4.dotElem then
+    -- Check for node declaration: node "id" ...
+    if stx.getArgs.size >= 2 then
+      if let some firstAtom := stx.getArgs[0]? then
+        if let some atomVal := getAtomValue firstAtom then
+          if atomVal == "node" then
+            if let some nodeIdStx := stx.getArgs[1]? then
+              if let some nodeId := extractNodeId nodeIdStx then
+                if let some range ← syntaxToSourceRange stx then
+                  locs := (nodeId, range) :: locs
+
+    -- Check for edge declaration: edge "src" -> "dst" ...
+    -- The syntax is: edge dotNodeRef arrowNode+ dotKV*
+    if stx.getArgs.size >= 3 then
+      if let some firstAtom := stx.getArgs[0]? then
+        if let some atomVal := getAtomValue firstAtom then
+          if atomVal == "edge" then
+            -- Extract source node
+            if let some srcRef := stx.getArgs[1]? then
+              if let some srcId := extractNodeId (srcRef.getArgs[0]?.getD srcRef) then
+                -- For each arrow target, create an edge location
+                for i in [2:stx.getArgs.size] do
+                  if let some arrowNode := stx.getArgs[i]? then
+                    if arrowNode.isOfKind `Dot4.arrowNode then
+                      if let some targetRef := arrowNode.getArgs[1]? then
+                        if let some dstId := extractNodeId (targetRef.getArgs[0]?.getD targetRef) then
+                          if let some range ← syntaxToSourceRange stx then
+                            let edgeId := s!"{srcId}->{dstId}"
+                            locs := (edgeId, range) :: locs
+
+  -- Recursively process children
+  for arg in stx.getArgs do
+    let childLocs ← extractSourceLocations arg
+    locs := childLocs ++ locs
+
+  return locs
+
+/-- Patch a Graph with source locations extracted from syntax -/
+def patchGraphWithLocations (g : Graph) (locs : List (String × SourceRange)) : Graph :=
+  -- Build a lookup function from the list
+  let findLoc (id : String) : Option SourceRange :=
+    locs.find? (fun (locId, _) => locId == id) |>.map (·.2)
+  let nodes := g.nodes.map fun n =>
+    match findLoc n.id with
+    | some range => { n with srcRange := some range }
+    | none => n
+  let edges := g.edges.map fun e =>
+    let edgeId := s!"{e.src}->{e.dst}"
+    match findLoc edgeId with
+    | some range => { e with srcRange := some range }
+    | none => e
+  { g with nodes := nodes, edges := edges }
 
 end Dot4

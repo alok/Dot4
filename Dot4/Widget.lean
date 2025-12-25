@@ -1,6 +1,7 @@
 import Dot4.Basic
 import Dot4.Render
 import Dot4.Validation
+import Dot4.Syntax
 import Lean
 import ProofWidgets.Component.Basic
 import ProofWidgets.Presentation.Expr
@@ -114,8 +115,18 @@ syntax (name := showDotCmd) "#dot " term : command
 unsafe def elabShowDotCmd : CommandElab := fun
   | stx@`(#dot $g:term) => do
     let (dotStr, srcLocs) ← liftTermElabM do
+      -- Check if g is a dot { ... } syntax to extract source locations
+      let syntaxLocs ← if g.raw.isOfKind `Dot4.term.dot then
+        extractSourceLocations g.raw
+      else
+        pure []
+
       let expr ← elabTerm g (some (Lean.mkConst ``Graph))
       let gr ← Lean.Meta.evalExpr' Graph ``Graph expr
+
+      -- Patch graph with extracted locations if any
+      let gr := if syntaxLocs.isEmpty then gr else patchGraphWithLocations gr syntaxLocs
+
       let dotStr := gr.toDot
       let srcLocs := gr.sourceLocations
       pure (dotStr, srcLocs)
